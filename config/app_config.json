@@ -1,0 +1,24 @@
+{
+  "DEBUG_PIPELINE": true,
+
+  "LLM_MODE": "ollama",
+  "LLM_MODEL_ID": "qwen2.5:7b",
+  "LLM_TEMPERATURE": 0.2,
+ 
+  "OLLAMA_BASE_URL": "http://localhost:11434/v1/",
+  "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+  "GEMINI_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "HUGGING_FACE_BASE_URL": "https://router.huggingface.co/v1",
+ 
+  "EXTRACTION_LLM_MODE": "openrouter",
+  "EXTRACTION_LLM_MODEL_ID": "openrouter/auto",
+  "EXTRACTION_LLM_TEMPERATURE": 0.1,
+ 
+  "CONSOLIDATION_LLM_MODE": "openrouter",
+  "CONSOLIDATION_LLM_MODEL_ID": "openrouter/auto",
+  "CONSOLIDATION_LLM_TEMPERATURE": 0.0,
+ 
+  "PROMPT_GENERATION_LLM_MODE": "openrouter",
+  "PROMPT_GENERATION_LLM_MODEL_ID": "google/gemma-4-31b-it:free",
+  "PROMPT_GENERATION_LLM_TEMPERATURE": 0.4
+}
