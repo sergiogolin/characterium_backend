@@ -17,11 +17,21 @@ class PromptItem(BaseModel):
     text: str
     edited: bool = False
 
+class GeneratedCharacterPrompt(BaseModel):
+    id: str
+    main_name: str
+    aliases: List[str] = Field(default_factory=list)
+    description: str
+    image_prompt: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+    warnings: List[str] = Field(default_factory=list)
+
 class JobResult(BaseModel):
     language: str
-    characters: list[dict] = []
+    characters: list[dict] = Field(default_factory=list)
     characters_text: str = ""
-    prompts: list[PromptItem] = []
+    prompts: list[PromptItem] = Field(default_factory=list)
+    generated_characters: list[GeneratedCharacterPrompt] = Field(default_factory=list)
 
 class JobState(BaseModel):
     job_id: str

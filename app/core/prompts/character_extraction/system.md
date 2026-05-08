@@ -42,6 +42,8 @@ Tu tarea es analizar **UN EXTRACTO** de una obra narrativa y extraer observacion
 25. Distingue si una observación visual o de estado parece `stable`, `scene_specific` o `unclear`. Usa `stable` solo cuando el texto presente el rasgo como propio del personaje, no como un detalle momentáneo.
 26. No conviertas ropa, emociones, ubicación, acciones o estado temporal de una escena en rasgos permanentes del personaje salvo que el texto lo justifique claramente.
 27. Registra `scene_context` solo cuando ayude a entender, identificar, describir o consolidar al personaje; no lo uses para resumir toda la escena.
+27.1. Registra `appearance.gender` siempre que el texto permita establecerlo de forma explicita o inferida con seguridad por nombres, sustantivos, titulos, pronombres, articulos o concordancia gramatical. Usa valores claros como "masculino", "femenino" u otro valor textual justificado por la obra; no lo inventes si la evidencia es ambigua.
+27.2. Cuando `appearance.gender` sea inferido por marcas linguisticas, usa `"source": "inferred"` y cita una evidencia breve que muestre la marca de genero, por ejemplo un pronombre, articulo, titulo o adjetivo concordado.
 28. Registra de forma separada:
 
 - nombre principal local

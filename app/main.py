@@ -13,6 +13,7 @@ from app.services.llm.llm_factory import get_consolidation_llm
 from app.services.consolidation.character_consolidation_llm import CharacterConsolidationLLM
 from app.services.consolidation.character_consolidator import CharacterConsolidator
 from app.services.extraction.character_extractor import extract_characters_from_chunks
+from app.services.prompt_generation.character_prompt_generator import generate_character_prompts
 from app.services.text_processing.chunking_service import ChunkingError, chunk_uploaded_content
 
 
@@ -23,6 +24,79 @@ app = FastAPI()
 def _debug_pipeline_print(*values) -> None:
     if is_debug_pipeline_enabled():
         print(*values)
+
+
+def _detect_book_language(content: str | list[str]) -> str:
+    """
+    Detecta de forma ligera el idioma principal del texto de entrada.
+
+    :param content: Texto leido del archivo o lista de bloques textuales
+    :return: Codigo de idioma usado por el resultado del job
+    """
+    text = "\n".join(content) if isinstance(content, list) else content
+    sample = f" {text[:20000].lower()} "
+
+    spanish_markers = [
+        " el ",
+        " la ",
+        " los ",
+        " las ",
+        " que ",
+        " de ",
+        " en ",
+        " una ",
+        " con ",
+        " para ",
+        " como ",
+        " pero ",
+        " por ",
+        " del ",
+        " se ",
+        " no ",
+    ]
+    english_markers = [
+        " the ",
+        " and ",
+        " that ",
+        " of ",
+        " in ",
+        " to ",
+        " with ",
+        " for ",
+        " as ",
+        " but ",
+        " by ",
+        " from ",
+        " was ",
+        " were ",
+        " not ",
+    ]
+
+    spanish_score = sum(sample.count(marker) for marker in spanish_markers)
+    english_score = sum(sample.count(marker) for marker in english_markers)
+
+    if spanish_score >= english_score and spanish_score > 0:
+        return "es"
+
+    if english_score > spanish_score:
+        return "en"
+
+    return "source"
+
+
+def _book_language_instruction(language: str) -> str:
+    """
+    Convierte el codigo interno en una instruccion comprensible para el LLM.
+
+    :param language: Codigo detectado
+    :return: Etiqueta/instruccion de idioma
+    """
+    labels = {
+        "es": "espanol",
+        "en": "ingles",
+    }
+
+    return labels.get(language, "el mismo idioma de los datos del personaje")
 
 
 @app.post("/upload")
@@ -111,16 +185,37 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         await progress.publish(
             step="character_consolidation",
             message="Consolidacion de personajes completada.",
+            pct=97,
+        )
+
+        book_language = _detect_book_language(content)
+
+        await progress.publish(
+            step="prompt_generation",
+            message="Generando fichas y prompts visuales de personajes...",
+            pct=97,
+        )
+
+        generated_characters = await generate_character_prompts(
+            result.get("characters", []),
+            book_language=_book_language_instruction(book_language),
+            progress=progress,
+        )
+
+        await progress.publish(
+            step="prompt_generation",
+            message="Generacion de fichas y prompts visuales completada.",
             pct=99,
         )
 
         jobs.set_done(
             job_id,
             JobResult(
-                language="es",
+                language=book_language,
                 characters=result.get("characters", []),
                 characters_text="",
                 prompts=[],
+                generated_characters=generated_characters,
             ),
         )
         await progress.publish(
