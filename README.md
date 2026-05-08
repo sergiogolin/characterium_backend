@@ -66,6 +66,47 @@ pip install -r requirements.txt
 
 ## Configuracion
 
+La configuracion se divide en tres piezas:
+
+- `env.example`: plantilla de variables de entorno. No contiene secretos.
+- `.env`: archivo local con secretos reales. No debe subirse al repositorio.
+- `config/app_config.json`: configuracion no secreta del pipeline LLM.
+
+### Variables de entorno
+
+Copia `env.example` a `.env` antes de arrancar el backend:
+
+```powershell
+Copy-Item env.example .env
+```
+
+Despues, edita `.env` y rellena solo las claves de los proveedores que vayas a usar. No hace falta configurar todas las `API_KEY`.
+
+Ejemplo:
+
+```env
+PYTHONDONTWRITEBYTECODE=1
+
+# PROVIDER SECRETS:
+OLLAMA_API_KEY=ollama
+OPENROUTER_API_KEY=sk-...
+GEMINI_API_KEY=
+HUGGING_FACE_API_KEY=
+```
+
+Para Ollama local normalmente basta con dejar `OLLAMA_API_KEY=ollama`, porque el servidor compatible con OpenAI requiere un valor aunque no valide una clave real.
+
+Claves reconocidas por proveedor:
+
+- `ollama`: `OLLAMA_API_KEY`
+- `openrouter`: `OPENROUTER_API_KEY` u `OPEN_ROUTER_API_KEY`
+- `gemini`: `GEMINI_API_KEY`
+- `hugging_face`: `HUGGING_FACE_API_KEY` o `HF_TOKEN`
+
+Tambien existe `LLM_API_KEY` como fallback generico si el proveedor seleccionado no tiene una clave especifica.
+
+### Configuracion de providers
+
 La configuracion no secreta vive en `config/app_config.json` y se recarga en caliente cuando cambia el archivo. Ahi puedes tocar provider, modelos, temperaturas, URLs base y flags como `DEBUG_PIPELINE` sin reiniciar el servidor.
 
 Configuracion minima recomendada para Ollama:
@@ -79,16 +120,7 @@ Configuracion minima recomendada para Ollama:
 }
 ```
 
-El archivo `.env` queda reservado para secretos, y tambien se usa como fallback si una clave no existe en el JSON:
-
-```env
-LLM_API_KEY=...
-OPENROUTER_API_KEY=...
-GEMINI_API_KEY=...
-HUGGING_FACE_API_KEY=...
-```
-
-Providers soportados:
+Providers soportados y URLs base habituales:
 
 ```json
 {
@@ -103,23 +135,18 @@ Providers soportados:
 }
 ```
 
-Las claves de API correspondientes siguen en `.env`:
+Para cambiar de proveedor global, modifica `LLM_MODE` y `LLM_MODEL_ID`:
 
-```env
-# Ollama, compatible con cliente OpenAI
-OLLAMA_API_KEY=ollama
-
-# Gemini
-GEMINI_API_KEY=...
-
-# OpenRouter
-OPENROUTER_API_KEY=...
-
-# Hugging Face
-HUGGING_FACE_API_KEY=...
+```json
+{
+  "LLM_MODE": "openrouter",
+  "LLM_MODEL_ID": "openrouter/auto",
+  "LLM_TEMPERATURE": 0.2,
+  "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1"
+}
 ```
 
-Tambien se pueden definir modelos distintos por fase. Si una configuracion por fase esta incompleta, el sistema vuelve a la configuracion global.
+Tambien se pueden definir providers, modelos y temperaturas distintos por fase. Si una configuracion por fase esta incompleta, el sistema vuelve a la configuracion global.
 
 ```json
 {
@@ -136,6 +163,14 @@ Tambien se pueden definir modelos distintos por fase. Si una configuracion por f
   "PROMPT_GENERATION_LLM_TEMPERATURE": 0.4
 }
 ```
+
+Las fases configurables son:
+
+- `EXTRACTION`: extraccion de personajes por fragmentos.
+- `CONSOLIDATION`: consolidacion y resolucion de identidades ambiguas.
+- `PROMPT_GENERATION`: generacion de prompts visuales cuando se use ese flujo.
+
+Cada fase puede usar un proveedor diferente, siempre que su `API_KEY` correspondiente este definida en `.env` si el proveedor la requiere.
 
 ## Ejecucion
 
