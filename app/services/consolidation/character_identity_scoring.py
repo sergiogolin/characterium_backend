@@ -14,9 +14,93 @@ from app.services.consolidation.character_identity import (
 AUTO_MERGE_THRESHOLD = 0.90
 LLM_REVIEW_THRESHOLD = 0.60
 
+COMMON_NAME_TOKENS = {
+    "a",
+    "al",
+    "ante",
+    "bajo",
+    "con",
+    "contra",
+    "de",
+    "del",
+    "desde",
+    "durante",
+    "e",
+    "el",
+    "ella",
+    "en",
+    "entre",
+    "hacia",
+    "hasta",
+    "la",
+    "las",
+    "lo",
+    "los",
+    "mediante",
+    "o",
+    "para",
+    "por",
+    "segun",
+    "sin",
+    "sobre",
+    "su",
+    "sus",
+    "tras",
+    "tu",
+    "tus",
+    "un",
+    "una",
+    "unas",
+    "unos",
+    "y",
+    "viejo",
+    "vieja",
+    "joven",
+    "pequeno",
+    "pequena",
+    "grande",
+    "alto",
+    "alta",
+    "baja",
+    "rojo",
+    "roja",
+    "azul",
+    "verde",
+    "negro",
+    "negra",
+    "blanco",
+    "blanca",
+    "gris",
+    "dorado",
+    "dorada",
+}
+
+GENERIC_PERSON_TOKENS = {
+    "adulto",
+    "adulta",
+    "anciano",
+    "anciana",
+    "chico",
+    "chica",
+    "hombre",
+    "joven",
+    "mujer",
+    "nino",
+    "nina",
+    "persona",
+}
+
 
 @dataclass
 class IdentityMatchResult:
+    """
+    Representa el resultado de comparar dos identidades de personaje.
+
+    :param score: Puntuacion normalizada de similitud entre 0.0 y 1.0
+    :param should_merge: Indica si los personajes deben fusionarse automaticamente
+    :param needs_llm_review: Indica si el caso debe enviarse al resolvedor LLM
+    :param reasons: Explicaciones programaticas que justifican la decision
+    """
     score: float
     should_merge: bool
     needs_llm_review: bool
@@ -52,6 +136,61 @@ def split_name(name: str) -> list[str]:
     :return: Lista de tokens normalizados del nombre
     """
     return normalize_text(name).split()
+
+
+def get_substantial_name_tokens(name: str) -> list[str]:
+    """
+    Devuelve las partes de nombre que cuentan como identidad fuerte.
+
+    :param name: Nombre normalizado a evaluar
+    :return: Tokens sin determinantes, conectores ni descriptores comunes
+    """
+    return [
+        part
+        for part in split_name(name)
+        if len(part) > 1 and part not in COMMON_NAME_TOKENS
+    ]
+
+
+def is_substantial_multiword_name(name: str) -> bool:
+    """
+    Comprueba si un nombre exacto tiene al menos dos partes no comunes.
+
+    :param name: Nombre normalizado a evaluar
+    :return: True si parece nombre + apellido u otra identidad compuesta fuerte
+    """
+    if looks_like_descriptive_form(name):
+        return False
+
+    return len(get_substantial_name_tokens(name)) >= 2
+
+
+def is_specific_appellation_name(name: str) -> bool:
+    """
+    Detecta apelativos especificos como "la reina roja" sin depender de mayusculas.
+
+    :param name: Nombre normalizado a evaluar
+    :return: True si parece un apelativo concreto y no una descripcion generica
+    """
+    parts = split_name(name)
+
+    if len(parts) < 3:
+        return False
+
+    if parts[0] not in {"el", "la", "los", "las"}:
+        return False
+
+    return parts[1] not in GENERIC_PERSON_TOKENS
+
+
+def is_auto_merge_exact_name(name: str) -> bool:
+    """
+    Decide si un nombre exacto compartido es suficientemente especifico para fusionar.
+
+    :param name: Nombre normalizado compartido
+    :return: True si el nombre exacto permite fusion automatica sin conflictos
+    """
+    return is_substantial_multiword_name(name) or is_specific_appellation_name(name)
 
 
 def is_comparable_name_variant(name: str) -> bool:
@@ -130,6 +269,24 @@ def has_exact_name_match(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return bool(get_all_identity_names(a) & get_all_identity_names(b))
 
 
+def get_substantial_exact_name_matches(
+    names_a: set[str],
+    names_b: set[str],
+) -> set[str]:
+    """
+    Obtiene nombres exactos compartidos que bastan para una fusion automatica.
+
+    :param names_a: Nombres normalizados del primer personaje
+    :param names_b: Nombres normalizados del segundo personaje
+    :return: Nombres exactos compartidos suficientemente especificos
+    """
+    return {
+        name
+        for name in names_a & names_b
+        if is_auto_merge_exact_name(name)
+    }
+
+
 def get_gender_value(character: dict[str, Any]) -> str | None:
     """
     Obtiene el genero normalizado de la apariencia de un personaje.
@@ -196,6 +353,38 @@ def compatible_age(a: dict[str, Any], b: dict[str, Any]) -> bool | None:
     return age_a == age_b
 
 
+def has_existing_attribute_conflicts(character: dict[str, Any]) -> bool:
+    """
+    Detecta conflictos ya consolidados en atributos usados para identidad.
+
+    :param character: Personaje consolidado o candidato
+    :return: True si hay conflictos de genero o edad aparente
+    """
+    appearance = character.get("appearance") or {}
+
+    for field in ("gender", "apparent_age"):
+        value = appearance.get(field)
+
+        if isinstance(value, dict) and value.get("conflicts"):
+            return True
+
+    return False
+
+
+def has_identity_conflict(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """
+    Comprueba si dos personajes tienen conflictos programaticos de identidad.
+
+    :param a: Primer personaje a comparar
+    :param b: Segundo personaje a comparar
+    :return: True si hay contradiccion de genero, edad o conflictos previos
+    """
+    if has_existing_attribute_conflicts(a) or has_existing_attribute_conflicts(b):
+        return True
+
+    return compatible_gender(a, b) is False or compatible_age(a, b) is False
+
+
 def get_reference_chunks(character: dict[str, Any]) -> list[int]:
     """
     Extrae los indices de chunk asociados a las referencias de un personaje.
@@ -250,8 +439,21 @@ def score_identity_match(a: dict[str, Any], b: dict[str, Any]) -> IdentityMatchR
             reasons=["Missing comparable names"],
         )
 
+    substantial_exact_matches = get_substantial_exact_name_matches(names_a, names_b)
+
+    if substantial_exact_matches and not has_identity_conflict(a, b):
+        return IdentityMatchResult(
+            score=1.0,
+            should_merge=True,
+            needs_llm_review=False,
+            reasons=[
+                "Exact specific identity name match without conflicts: "
+                + ", ".join(sorted(substantial_exact_matches))
+            ],
+        )
+
     if has_exact_name_match(a, b):
-        score += 0.95
+        score += 0.80
         reasons.append("Exact identity name match")
 
     else:
