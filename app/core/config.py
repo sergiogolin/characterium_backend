@@ -5,6 +5,7 @@ from app.core.runtime_config import get_config_bool, get_config_str, get_config_
 
 load_dotenv()
 
+
 def get_str(name: str, default: str | None = None) -> str:
     val = get_config_str(name, os.getenv(name, default))
     return (val or "").strip()

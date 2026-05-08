@@ -1,0 +1,13 @@
+Compara los dos candidatos usando solo la informacion incluida a continuacion.
+
+PROGRAMMATIC_SCORE:
+{{PROGRAMMATIC_SCORE}}
+
+PROGRAMMATIC_REASONS:
+{{PROGRAMMATIC_REASONS_JSON}}
+
+CANDIDATE_A:
+{{CANDIDATE_A_JSON}}
+
+CANDIDATE_B:
+{{CANDIDATE_B_JSON}}

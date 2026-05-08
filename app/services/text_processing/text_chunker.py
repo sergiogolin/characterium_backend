@@ -1,14 +1,29 @@
 import re
 from typing import List, Union
 
+from app.core.runtime_config import get_config_value
+
+
+def _get_config_int(name: str, default: int) -> int:
+    return int(get_config_value(name, default))
+
+
+def _resolve_chunk_params(
+    max_chars: int | None,
+    overlap_paragraphs: int | None,
+) -> tuple[int, int]:
+    return (
+        _get_config_int("DEFAULT_MAX_CHARS", 5000) if max_chars is None else max_chars,
+        _get_config_int("DEFAULT_OVERLAP_PARAGRAPHS", 1)
+        if overlap_paragraphs is None
+        else overlap_paragraphs,
+    )
+
 
 class TextChunker:
     """Utilidad para dividir texto en chunks de manera jerárquica y optimizada."""
 
     # ========== CONSTANTES ==========
-    DEFAULT_MAX_CHARS = 5000
-    DEFAULT_OVERLAP_PARAGRAPHS = 1
-    
     CHAPTER_SEPARATORS = [
         r"\n(?:Capítulo|Capitulo|Chapter)\s+[\w\dIVXLC]+",
         r"\n(?:Parte|Part)\s+[\w\dIVXLC]+",
@@ -28,8 +43,8 @@ class TextChunker:
     @staticmethod
     def chunk(
         content: Union[str, List[str]],
-        max_chars: int = DEFAULT_MAX_CHARS,
-        overlap_paragraphs: int = DEFAULT_OVERLAP_PARAGRAPHS
+        max_chars: int | None = None,
+        overlap_paragraphs: int | None = None
     ) -> List[str]:
         """
         Orquesta el chunking jerárquico:
@@ -49,6 +64,11 @@ class TextChunker:
 
         if not content:
             return []
+
+        max_chars, overlap_paragraphs = _resolve_chunk_params(
+            max_chars,
+            overlap_paragraphs,
+        )
 
         source_blocks = TextChunker._prepare_source_blocks(content)
         if not source_blocks:
@@ -114,8 +134,8 @@ class TextChunker:
     @staticmethod
     def build_chunks_from_paragraphs(
         paragraphs: List[str],
-        max_chars: int = DEFAULT_MAX_CHARS,
-        overlap_paragraphs: int = DEFAULT_OVERLAP_PARAGRAPHS
+        max_chars: int | None = None,
+        overlap_paragraphs: int | None = None
     ) -> List[str]:
         """
         Construye chunks a partir de párrafos completos.
@@ -139,6 +159,11 @@ class TextChunker:
 
         if not paragraphs:
             return []
+
+        max_chars, overlap_paragraphs = _resolve_chunk_params(
+            max_chars,
+            overlap_paragraphs,
+        )
 
         TextChunker._validate_chunk_params(max_chars, overlap_paragraphs)
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from app.services.llm.base import BaseLLM
 from app.services.llm.json_utils import parse_json_object_response
+from app.services.prompts.prompt_loader import load_prompt, render_prompt
 
 
 class CharacterConsolidationLLM:
@@ -35,7 +36,7 @@ class CharacterConsolidationLLM:
         :param score: Puntuacion programatica calculada antes del LLM
         :return: Decision normalizada con should_merge, confidence y reason
         """
-        developer_prompt = self._build_developer_prompt()
+        system_prompt = load_prompt("character_consolidation/system.md")
         user_prompt = self._build_user_prompt(
             candidate_a=candidate_a,
             candidate_b=candidate_b,
@@ -44,7 +45,7 @@ class CharacterConsolidationLLM:
         )
 
         response = await self.llm.call_llm(
-            system_prompt=developer_prompt,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
         decision = parse_json_object_response(response)
@@ -60,37 +61,6 @@ class CharacterConsolidationLLM:
 
         return decision
 
-    def _build_developer_prompt(self) -> str:
-        """
-        Construye el prompt de sistema para evaluar ambiguedades de identidad.
-
-        :return: Prompt con reglas de consolidacion y formato JSON esperado
-        """
-        return """
-Eres un sistema experto en consolidación de personajes literarios.
-
-Tu tarea es decidir si dos referencias extraídas de una obra narrativa corresponden al mismo personaje.
-
-Reglas obligatorias:
-1. Devuelve SOLO JSON válido.
-2. No escribas texto fuera del JSON.
-3. No inventes información.
-4. Usa únicamente los datos proporcionados.
-5. No fusiones personajes si hay contradicciones fuertes de identidad, género, edad, rol o contexto.
-6. Los pronombres son evidencia débil.
-7. Los títulos, cargos o descriptores no cuentan como alias, pero pueden ayudar a identificar.
-8. Nombres parciales pueden corresponder al mismo personaje si son compatibles con nombres completos.
-9. Apelativos específicos como "el Mago Gris" o "la Reina Roja" pueden identificar a un personaje.
-10. Ante duda real, devuelve should_merge=false.
-
-Formato obligatorio:
-{
-  "should_merge": true,
-  "confidence": "high",
-  "reason": "explicación breve"
-}
-""".strip()
-
     def _build_user_prompt(
         self,
         candidate_a: dict[str, Any],
@@ -105,13 +75,14 @@ Formato obligatorio:
         :param candidate_b: Segundo candidato a comparar
         :param reasons: Razones programaticas de similitud o duda
         :param score: Score programatico asociado a la comparacion
-        :return: Payload JSON serializado para enviar al LLM
+        :return: Prompt de usuario renderizado para enviar al LLM
         """
-        payload = {
-            "programmatic_score": score,
-            "programmatic_reasons": reasons,
-            "candidate_a": candidate_a,
-            "candidate_b": candidate_b,
-        }
+        user_template = load_prompt("character_consolidation/user.md")
 
-        return json.dumps(payload, ensure_ascii=False, indent=2)
+        return render_prompt(
+            user_template,
+            PROGRAMMATIC_SCORE=score,
+            PROGRAMMATIC_REASONS_JSON=json.dumps(reasons, ensure_ascii=False, indent=2),
+            CANDIDATE_A_JSON=json.dumps(candidate_a, ensure_ascii=False, indent=2),
+            CANDIDATE_B_JSON=json.dumps(candidate_b, ensure_ascii=False, indent=2),
+        )
