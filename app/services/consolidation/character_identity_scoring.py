@@ -120,6 +120,11 @@ def get_all_identity_names(character: dict[str, Any]) -> set[str]:
         *(character.get("aliases") or []),
         *(character.get("specific_appellations") or []),
     }
+    names.update(
+        item.get("value", "")
+        for item in character.get("identity_names", [])
+        if isinstance(item, dict)
+    )
 
     return {
         normalize_text(name)

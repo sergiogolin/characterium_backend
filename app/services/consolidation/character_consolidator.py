@@ -17,6 +17,7 @@ from app.services.consolidation.character_merge import (
     make_reference,
     merge_character_groups,
     merge_field_object,
+    merge_identity_name,
     merge_references,
     merge_unique_values,
 )
@@ -79,6 +80,11 @@ class CharacterConsolidator:
         consolidated = list(groups.values())
 
         consolidated, ambiguous_groups = await self._merge_until_stable(consolidated)
+
+        self._apply_unresolved_ambiguity_flags(consolidated, ambiguous_groups)
+
+        for character in consolidated:
+            self._update_canonical_identity(character)
 
         for character in consolidated:
             self._mark_conflicts(character)
@@ -160,27 +166,23 @@ class CharacterConsolidator:
                         {
                             "candidate_a": {
                                 "canonical_name": base["canonical_name"],
+                                "display_name": base.get("display_name"),
+                                "aliases": base.get("aliases", []),
+                                "identity_names": base.get("identity_names", []),
+                                "specific_appellations": base.get("specific_appellations", []),
                                 "references": base.get("references", []),
                             },
                             "candidate_b": {
                                 "canonical_name": candidate["canonical_name"],
+                                "display_name": candidate.get("display_name"),
+                                "aliases": candidate.get("aliases", []),
+                                "identity_names": candidate.get("identity_names", []),
+                                "specific_appellations": candidate.get("specific_appellations", []),
                                 "references": candidate.get("references", []),
                             },
                             "score": match.score,
                             "reasons": match.reasons,
                         }
-                    )
-
-                    base["needs_llm_review"] = True
-                    base["confidence"] = "low"
-                    base["ambiguity_reasons"].append(
-                        f"Possible same character as '{candidate['canonical_name']}'"
-                    )
-
-                    candidate["needs_llm_review"] = True
-                    candidate["confidence"] = "low"
-                    candidate["ambiguity_reasons"].append(
-                        f"Possible same character as '{base['canonical_name']}'"
                     )
 
             merged.append(base)
@@ -237,9 +239,41 @@ class CharacterConsolidator:
                 )
             else:
                 ambiguous["llm_decision"] = decision
-                unresolved.append(ambiguous)
 
         return characters, unresolved
+
+    def _apply_unresolved_ambiguity_flags(
+        self,
+        characters: list[dict[str, Any]],
+        ambiguous_groups: list[dict[str, Any]],
+    ) -> None:
+        """
+        Marca solo las ambiguedades que no han sido resueltas por reglas ni por LLM.
+
+        :param characters: Personajes consolidados finales
+        :param ambiguous_groups: Pares ambiguos todavia pendientes
+        :return: None
+        """
+        for ambiguous in ambiguous_groups:
+            name_a = ambiguous["candidate_a"]["canonical_name"]
+            name_b = ambiguous["candidate_b"]["canonical_name"]
+
+            character_a = self._find_character_by_name(characters, name_a)
+            character_b = self._find_character_by_name(characters, name_b)
+
+            if character_a:
+                character_a["needs_llm_review"] = True
+                character_a["confidence"] = "low"
+                character_a["ambiguity_reasons"].append(
+                    f"Possible same character as '{name_b}'"
+                )
+
+            if character_b:
+                character_b["needs_llm_review"] = True
+                character_b["confidence"] = "low"
+                character_b["ambiguity_reasons"].append(
+                    f"Possible same character as '{name_a}'"
+                )
 
     def _build_group_key(
         self,
@@ -284,6 +318,7 @@ class CharacterConsolidator:
             "display_name": canonical_name,
             "entity_type": "named" if reference_type == "named" else "descriptive",
             "aliases": [],
+            "identity_names": [],
             "specific_appellations": [],
             "titles_roles_descriptors": [],
             "references": [
@@ -463,11 +498,40 @@ class CharacterConsolidator:
                 continue
 
             if candidate.is_specific_appellation:
+                self._merge_identity_name(
+                    group,
+                    value=candidate.value,
+                    name_type="specific_appellation",
+                    chunk_index=candidate.source_chunk_index,
+                    local_id=candidate.source_local_id,
+                )
                 self._append_unique(group["specific_appellations"], candidate.value)
                 continue
 
             if candidate.has_title:
+                self._merge_identity_name(
+                    group,
+                    value=candidate.value,
+                    name_type="title",
+                    chunk_index=candidate.source_chunk_index,
+                    local_id=candidate.source_local_id,
+                )
+                self._merge_identity_name(
+                    group,
+                    value=candidate.without_titles,
+                    name_type="name",
+                    chunk_index=candidate.source_chunk_index,
+                    local_id=candidate.source_local_id,
+                )
                 continue
+
+            self._merge_identity_name(
+                group,
+                value=candidate.without_titles,
+                name_type="name",
+                chunk_index=candidate.source_chunk_index,
+                local_id=candidate.source_local_id,
+            )
 
             if value_normalized != canonical_normalized:
                 self._append_unique(group["aliases"], candidate.without_titles)
@@ -487,6 +551,133 @@ class CharacterConsolidator:
                     clean_item,
                     key="value",
                 )
+
+    def _merge_identity_name(
+        self,
+        group: dict[str, Any],
+        value: str,
+        name_type: str,
+        chunk_index: int,
+        local_id: str,
+    ) -> None:
+        """
+        Registra una forma observada de identidad con su referencia de origen.
+
+        :param group: Grupo consolidado que recibira la variante
+        :param value: Forma textual observada
+        :param name_type: Tipo de forma: name, alias, specific_appellation o title
+        :param chunk_index: Indice de chunk de origen
+        :param local_id: Identificador local de origen
+        :return: None
+        """
+        if not value:
+            return
+
+        group["identity_names"] = merge_identity_name(
+            group.get("identity_names", []),
+            value=value,
+            name_type=name_type,
+            references=[make_reference(chunk_index, local_id)],
+        )
+
+    def _update_canonical_identity(self, character: dict[str, Any]) -> None:
+        """
+        Recalcula el nombre canonico desde todas las variantes consolidadas.
+
+        :param character: Personaje consolidado a actualizar
+        :return: None
+        """
+        identity_names = character.get("identity_names", [])
+        valid_names = [
+            item
+            for item in identity_names
+            if self._is_valid_canonical_identity_name(item)
+        ]
+
+        if not valid_names:
+            return
+
+        best_name = sorted(
+            valid_names,
+            key=self._canonical_identity_score,
+            reverse=True,
+        )[0]["value"]
+
+        previous_name = character.get("canonical_name")
+
+        character["canonical_name"] = best_name
+        character["display_name"] = best_name
+
+        if previous_name and normalize_text(previous_name) != normalize_text(best_name):
+            self._append_unique(character["aliases"], previous_name)
+
+        self._sync_identity_alias_lists(character)
+
+    def _is_valid_canonical_identity_name(self, item: dict[str, Any]) -> bool:
+        """
+        Decide si una variante puede actuar como nombre canonico final.
+
+        :param item: Variante de identidad observada
+        :return: True si es una candidata canonica util
+        """
+        value = item.get("value", "")
+        normalized = normalize_text(value)
+
+        if not value or looks_like_descriptive_form(value):
+            return False
+
+        if normalized in {"unknown", "desconocido", "personaje", "character"}:
+            return False
+
+        return item.get("type") != "title"
+
+    def _canonical_identity_score(self, item: dict[str, Any]) -> tuple[int, int, int, int]:
+        """
+        Puntua una variante para elegir el nombre mas representativo.
+
+        :param item: Variante de identidad observada
+        :return: Tupla ordenable de prioridad
+        """
+        value = item.get("value", "")
+        normalized = normalize_text(value)
+        type_priority = {
+            "name": 4,
+            "alias": 3,
+            "specific_appellation": 2,
+            "title": 1,
+        }
+
+        return (
+            type_priority.get(item.get("type", "name"), 0),
+            len(normalized.split()),
+            len(value),
+            len(item.get("references", [])),
+        )
+
+    def _sync_identity_alias_lists(self, character: dict[str, Any]) -> None:
+        """
+        Sincroniza alias y apelativos desde el registro completo de identidad.
+
+        :param character: Personaje consolidado a actualizar
+        :return: None
+        """
+        canonical_normalized = normalize_text(character.get("canonical_name", ""))
+
+        for item in character.get("identity_names", []):
+            value = item.get("value")
+            if not value or normalize_text(value) == canonical_normalized:
+                continue
+
+            if item.get("type") == "specific_appellation":
+                self._append_unique(character["specific_appellations"], value)
+            elif item.get("type") in {"name", "alias"}:
+                self._append_unique(character["aliases"], value)
+
+        character["aliases"] = [
+            alias
+            for alias in character.get("aliases", [])
+            if normalize_text(alias) != canonical_normalized
+        ]
 
     def _mark_conflicts(self, character: dict[str, Any]) -> None:
         """
@@ -570,6 +761,7 @@ class CharacterConsolidator:
             "display_name": character.get("display_name"),
             "entity_type": character.get("entity_type"),
             "aliases": character.get("aliases", []),
+            "identity_names": character.get("identity_names", []),
             "specific_appellations": character.get("specific_appellations", []),
             "titles_roles_descriptors": character.get("titles_roles_descriptors", []),
             "references": character.get("references", []),

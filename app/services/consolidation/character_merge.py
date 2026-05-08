@@ -34,8 +34,19 @@ def merge_character_groups(target: dict[str, Any], source: dict[str, Any]) -> di
         source.get("references", []),
     )
 
+    target["identity_names"] = merge_identity_names(
+        target.get("identity_names", []),
+        source.get("identity_names", []),
+    )
+
+    for identity_name in [source.get("canonical_name"), source.get("display_name")]:
+        if identity_name and normalize_text(identity_name) != normalize_text(
+            target.get("canonical_name", "")
+        ):
+            append_unique_string(target["aliases"], identity_name)
+
     for alias in source.get("aliases", []):
-        if alias != target.get("canonical_name"):
+        if normalize_text(alias) != normalize_text(target.get("canonical_name", "")):
             append_unique_string(target["aliases"], alias)
 
     for appellation in source.get("specific_appellations", []):
@@ -54,8 +65,10 @@ def merge_character_groups(target: dict[str, Any], source: dict[str, Any]) -> di
                     value,
                 )
             elif isinstance(value, dict):
-                if not target[section].get(key):
-                    target[section][key] = value
+                target[section][key] = merge_consolidated_field_object(
+                    target[section].get(key),
+                    value,
+                )
 
     target["motivations_goals"] = merge_object_list_by_value(
         target.get("motivations_goals", []),
@@ -71,6 +84,169 @@ def merge_character_groups(target: dict[str, Any], source: dict[str, Any]) -> di
     )
 
     return target
+
+
+def merge_identity_names(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Fusiona variantes de identidad observadas y acumula sus referencias.
+
+    :param existing: Variantes ya consolidadas
+    :param incoming: Variantes nuevas
+    :return: Lista de variantes fusionada por valor normalizado
+    """
+    merged = existing[:]
+
+    for item in incoming:
+        value = item.get("value")
+        if not value:
+            continue
+
+        merged = merge_identity_name(
+            merged,
+            value=value,
+            name_type=item.get("type", "name"),
+            references=item.get("references", []),
+        )
+
+    return merged
+
+
+def merge_identity_name(
+    existing: list[dict[str, Any]],
+    value: str,
+    name_type: str,
+    references: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Anade o actualiza una variante de identidad observada.
+
+    :param existing: Variantes ya consolidadas
+    :param value: Forma textual observada
+    :param name_type: Tipo de forma: name, alias, specific_appellation o title
+    :param references: Referencias donde aparece
+    :return: Lista de variantes actualizada
+    """
+    normalized = normalize_text(value)
+
+    for item in existing:
+        if normalize_text(item.get("value", "")) != normalized:
+            continue
+
+        item["references"] = merge_references_bulk(
+            item.get("references", []),
+            references,
+        )
+        item["type"] = choose_stronger_identity_type(
+            item.get("type", "name"),
+            name_type,
+        )
+        return existing
+
+    existing.append(
+        {
+            "value": value,
+            "type": name_type,
+            "references": references,
+        }
+    )
+    return existing
+
+
+def choose_stronger_identity_type(existing: str, incoming: str) -> str:
+    """
+    Conserva el tipo de identidad mas util para seleccion canonica.
+
+    :param existing: Tipo ya registrado
+    :param incoming: Tipo entrante
+    :return: Tipo con mayor prioridad
+    """
+    priority = {
+        "name": 4,
+        "alias": 3,
+        "specific_appellation": 2,
+        "title": 1,
+    }
+
+    if priority.get(incoming, 0) > priority.get(existing, 0):
+        return incoming
+
+    return existing
+
+
+def merge_consolidated_field_object(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """
+    Fusiona dos campos simples ya consolidados, conservando conflictos.
+
+    :param existing: Valor consolidado existente
+    :param incoming: Valor consolidado entrante
+    :return: Campo fusionado o None
+    """
+    if not incoming or not incoming.get("value"):
+        return existing
+
+    if not existing or not existing.get("value"):
+        return incoming
+
+    if normalize_text(existing["value"]) == normalize_text(incoming["value"]):
+        existing["references"] = merge_references_bulk(
+            existing.get("references", []),
+            incoming.get("references", []),
+        )
+        conflicts = merge_conflict_objects(
+            existing.get("conflicts", []),
+            incoming.get("conflicts", []),
+        )
+        if conflicts:
+            existing["conflicts"] = conflicts
+        return existing
+
+    conflict = {
+        key: val
+        for key, val in incoming.items()
+        if key != "conflicts"
+    }
+    existing["conflicts"] = merge_conflict_objects(
+        existing.get("conflicts", []),
+        [conflict] + incoming.get("conflicts", []),
+    )
+    return existing
+
+
+def merge_conflict_objects(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Fusiona conflictos evitando duplicados por valor normalizado.
+
+    :param existing: Conflictos ya registrados
+    :param incoming: Conflictos nuevos
+    :return: Lista de conflictos fusionada
+    """
+    by_value: dict[str, dict[str, Any]] = {}
+
+    for item in existing + incoming:
+        value = item.get("value")
+        if not value:
+            continue
+
+        normalized = normalize_text(value)
+
+        if normalized not in by_value:
+            by_value[normalized] = item
+        else:
+            by_value[normalized]["references"] = merge_references_bulk(
+                by_value[normalized].get("references", []),
+                item.get("references", []),
+            )
+
+    return list(by_value.values())
 
 
 def merge_field_object(
