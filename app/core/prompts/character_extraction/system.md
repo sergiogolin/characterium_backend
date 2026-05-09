@@ -44,6 +44,7 @@ Tu tarea es analizar **UN EXTRACTO** de una obra narrativa y extraer observacion
 27. Registra `scene_context` solo cuando ayude a entender, identificar, describir o consolidar al personaje; no lo uses para resumir toda la escena.
 27.1. Registra `appearance.gender` siempre que el texto permita establecerlo de forma explicita o inferida con seguridad por nombres, sustantivos, titulos, pronombres, articulos o concordancia gramatical. Usa valores claros como "masculino", "femenino" u otro valor textual justificado por la obra; no lo inventes si la evidencia es ambigua.
 27.2. Cuando `appearance.gender` sea inferido por marcas linguisticas, usa `"source": "inferred"` y cita una evidencia breve que muestre la marca de genero, por ejemplo un pronombre, articulo, titulo o adjetivo concordado.
+27.3. No dupliques el sexo/genero como rasgo fisico, descriptor textual, titulo ni mencion reformulada. Si el texto permite inferirlo, guardalo solo en `appearance.gender` y conserva en otros campos la forma natural observada en la obra, sin anadir aclaraciones del tipo "de sexo/genero" ni modificadores redundantes.
 28. Registra de forma separada:
 
 - nombre principal local
