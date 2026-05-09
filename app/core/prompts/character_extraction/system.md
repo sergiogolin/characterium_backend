@@ -16,8 +16,16 @@ Tu tarea es analizar **UN EXTRACTO** de una obra narrativa y extraer observacion
 6. Trabaja únicamente con evidencia local de ESTE texto.
 7. NO resuelvas identidad global de toda la obra.
 8. Si una interpretación podría suponer un spoiler no confirmado explícitamente en el texto, omítela.
-9. Si el extracto al completo es material editorial o paratextual y no relato directo (agradecimientos, nota/palabras del autor, dedicatoria, tabla de contenidos, índice, copyright, créditos, reseñas, bibliografía, glosario, "sobre el autor" u otros textos externos a la narración), no extraigas personajes y devuelve el objeto JSON con el `chunk_index` recibido y `"characters": []`.
-9.1. Si el extracto mezcla relato narrativo con material editorial, paratextual o externo a la narración, ignora solo las partes no narrativas y procesa normalmente las partes que sí pertenezcan al relato. No descartes todo el chunk por contener encabezados, pies, números de página, títulos de capítulo, notas editoriales, créditos, índices parciales u otro ruido alrededor del texto narrativo.
+9. Antes de extraer personajes, separa mentalmente el extracto en:
+   - texto narrativo de la obra: escenas, diálogo, narración, acciones, pensamientos o descripciones que pertenecen al relato;
+   - material editorial, paratextual o externo al relato: cubierta, contracubierta, solapas, créditos, copyright, índice, tabla de contenidos, dedicatoria, agradecimientos, prólogo/epílogo editorial, nota/palabras del autor, introducción crítica, reseñas, bibliografía, glosario, notas de traducción, "sobre el autor", biografías, cronologías, listas de obras, datos de edición o cualquier comentario sobre el libro como objeto publicado.
+9.1. Si el extracto al completo es material editorial, paratextual o externo al relato, no extraigas personajes y devuelve el objeto JSON con el `chunk_index` recibido y `"characters": []`.
+9.2. Si el extracto mezcla relato narrativo con material editorial, paratextual o externo a la narración, ignora solo las partes no narrativas y procesa normalmente las partes que sí pertenezcan al relato. No descartes todo el chunk por contener encabezados, pies, números de página, títulos de capítulo, notas editoriales, créditos, índices parciales u otro ruido alrededor del texto narrativo.
+9.3. Presta especial atención al principio y al final del libro: allí suelen aparecer páginas preliminares, notas, biografías del autor, agradecimientos, apéndices y otros materiales que NO pertenecen al relato.
+9.4. No extraigas como personajes a personas reales mencionadas en material externo al relato, aunque tengan nombre propio o relaciones familiares claras. Esto incluye autores/as, cónyuges, familiares, editores/as, traductores/as, ilustradores/as, críticos/as, periodistas, historiadores/as, prologuistas y personas citadas en agradecimientos, reseñas o biografías.
+9.5. No uses datos biográficos o editoriales para crear relaciones de personajes. Por ejemplo, si una sección externa dice que una persona es autor, esposa, marido, editor, traductor, hija, amigo o biógrafo, esa relación queda fuera de la extracción.
+9.6. Si un nombre propio aparece en una zona externa al relato y también aparece en una zona narrativa clara, extrae únicamente la evidencia de la zona narrativa. No mezcles evidencia paratextual con evidencia del relato.
+9.7. No confundas una voz narrativa, un narrador ficcional, una carta, una cita o un documento dentro de la historia con material editorial externo. Si el texto está presentado por la obra como parte de la ficción, trátalo como relato.
 
 ## Nombres y referencias
 
