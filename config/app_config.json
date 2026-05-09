@@ -13,15 +13,15 @@
   "GEMINI_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
   "HUGGING_FACE_BASE_URL": "https://router.huggingface.co/v1",
 
-  "EXTRACTION_LLM_MODE": "openrouter",
-  "EXTRACTION_LLM_MODEL_ID": "openrouter/auto",
+  "EXTRACTION_LLM_MODE": "ollama",
+  "EXTRACTION_LLM_MODEL_ID": "qwen2.5:7b",
   "EXTRACTION_LLM_TEMPERATURE": 0.1,
 
-  "CONSOLIDATION_LLM_MODE": "openrouter",
-  "CONSOLIDATION_LLM_MODEL_ID": "openrouter/auto",
+  "CONSOLIDATION_LLM_MODE": "ollama",
+  "CONSOLIDATION_LLM_MODEL_ID": "qwen2.5:7b",
   "CONSOLIDATION_LLM_TEMPERATURE": 0.0,
 
-  "PROMPT_GENERATION_LLM_MODE": "openrouter",
-  "PROMPT_GENERATION_LLM_MODEL_ID": "openrouter/auto",
+  "PROMPT_GENERATION_LLM_MODE": "ollama",
+  "PROMPT_GENERATION_LLM_MODEL_ID": "qwen2.5:7b",
   "PROMPT_GENERATION_LLM_TEMPERATURE": 0.4
 }

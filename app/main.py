@@ -14,6 +14,7 @@ from app.services.consolidation.character_consolidation_llm import CharacterCons
 from app.services.consolidation.character_consolidator import CharacterConsolidator
 from app.services.extraction.character_extractor import extract_characters_from_chunks
 from app.services.prompt_generation.character_prompt_generator import generate_character_prompts
+from app.services.source_tools.character_source_tools import CharacterSourceTools
 from app.services.text_processing.chunking_service import ChunkingError, chunk_uploaded_content
 
 
@@ -152,6 +153,7 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         )
 
         chunks = chunk_uploaded_content(content)
+        source_tools = CharacterSourceTools(chunks)
         _debug_pipeline_print(f"\nTotal chunks generados: {len(chunks)}")
 
         await progress.publish(
@@ -173,7 +175,7 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         )
 
         llm = get_consolidation_llm()
-        llm_resolver = CharacterConsolidationLLM(llm)
+        llm_resolver = CharacterConsolidationLLM(llm, source_tools=source_tools)
         consolidator = CharacterConsolidator(llm_resolver=llm_resolver)
 
         result = await consolidator.consolidate(chunk_results)
@@ -200,6 +202,7 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
             result.get("characters", []),
             book_language=_book_language_instruction(book_language),
             progress=progress,
+            source_tools=source_tools,
         )
 
         await progress.publish(

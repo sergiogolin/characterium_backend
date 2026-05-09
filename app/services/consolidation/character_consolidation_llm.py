@@ -8,17 +8,20 @@ from typing import Any
 from app.services.llm.base import BaseLLM
 from app.services.llm.json_utils import parse_json_object_response
 from app.services.prompts.prompt_loader import load_prompt, render_prompt
+from app.services.source_tools.character_source_tools import CharacterSourceTools
 
 
 class CharacterConsolidationLLM:
-    def __init__(self, llm: BaseLLM) -> None:
+    def __init__(self, llm: BaseLLM, source_tools: CharacterSourceTools | None = None) -> None:
         """
         Inicializa el resolvedor LLM de ambiguedades de consolidacion.
 
         :param llm: Cliente LLM usado para decidir fusiones ambiguas
+        :param source_tools: Herramientas opcionales de consulta del texto fuente
         :return: None
         """
         self.llm = llm
+        self.source_tools = source_tools
 
     async def resolve_ambiguity(
         self,
@@ -85,4 +88,55 @@ class CharacterConsolidationLLM:
             PROGRAMMATIC_REASONS_JSON=json.dumps(reasons, ensure_ascii=False, indent=2),
             CANDIDATE_A_JSON=json.dumps(candidate_a, ensure_ascii=False, indent=2),
             CANDIDATE_B_JSON=json.dumps(candidate_b, ensure_ascii=False, indent=2),
+            SOURCE_CONTEXT_JSON=json.dumps(
+                self._build_source_context(candidate_a, candidate_b),
+                ensure_ascii=False,
+                indent=2,
+            ),
         )
+
+    def _build_source_context(
+        self,
+        candidate_a: dict[str, Any],
+        candidate_b: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Prepara resultados de herramientas de fuente para el prompt de ambiguedad.
+        """
+        if not self.source_tools:
+            return {}
+
+        names_a = self._identity_terms(candidate_a)
+        names_b = self._identity_terms(candidate_b)
+
+        return {
+            "candidate_a_source_snippets": self.source_tools.get_source_snippets(
+                candidate_a.get("references", []),
+                query_terms=names_a,
+            ),
+            "candidate_b_source_snippets": self.source_tools.get_source_snippets(
+                candidate_b.get("references", []),
+                query_terms=names_b,
+            ),
+            "candidate_a_mentions": self.source_tools.find_character_mentions(names_a),
+            "candidate_b_mentions": self.source_tools.find_character_mentions(names_b),
+        }
+
+    def _identity_terms(self, candidate: dict[str, Any]) -> list[str]:
+        terms: list[str] = []
+
+        for value in [
+            candidate.get("canonical_name"),
+            candidate.get("display_name"),
+            *(candidate.get("aliases") or []),
+            *(candidate.get("specific_appellations") or []),
+        ]:
+            if isinstance(value, str) and value.strip():
+                terms.append(value.strip())
+
+        for item in candidate.get("identity_names", []) or []:
+            value = item.get("value") if isinstance(item, dict) else None
+            if isinstance(value, str) and value.strip():
+                terms.append(value.strip())
+
+        return terms

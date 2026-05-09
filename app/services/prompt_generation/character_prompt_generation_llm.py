@@ -7,17 +7,20 @@ from app.services.consolidation.character_identity import normalize_text
 from app.services.llm.base import BaseLLM
 from app.services.llm.json_utils import parse_json_object_response
 from app.services.prompts.prompt_loader import load_prompt, render_prompt
+from app.services.source_tools.character_source_tools import CharacterSourceTools
 
 
 class CharacterPromptGenerationLLM:
-    def __init__(self, llm: BaseLLM) -> None:
+    def __init__(self, llm: BaseLLM, source_tools: CharacterSourceTools | None = None) -> None:
         """
         Inicializa el generador LLM de fichas finales de personaje.
 
         :param llm: Cliente LLM usado para generar textos finales
+        :param source_tools: Herramientas opcionales de consulta del texto fuente
         :return: None
         """
         self.llm = llm
+        self.source_tools = source_tools
 
     async def generate_character_prompt(
         self,
@@ -62,8 +65,47 @@ class CharacterPromptGenerationLLM:
         return render_prompt(
             user_template,
             BOOK_LANGUAGE=book_language,
-            CHARACTER_JSON=json.dumps(character, ensure_ascii=False, indent=2),
+            CHARACTER_JSON=json.dumps(
+                self._with_source_snippets(character),
+                ensure_ascii=False,
+                indent=2,
+            ),
         )
+
+    def _with_source_snippets(self, character: dict[str, Any]) -> dict[str, Any]:
+        """
+        Anade fragmentos originales al payload de entrada sin cambiar la salida final.
+        """
+        if not self.source_tools:
+            return character
+
+        enriched = dict(character)
+        enriched["source_snippets"] = self.source_tools.get_source_snippets(
+            character.get("references", []),
+            query_terms=self._identity_terms(character),
+        )
+        enriched.pop("references", None)
+
+        return enriched
+
+    def _identity_terms(self, character: dict[str, Any]) -> list[str]:
+        terms: list[str] = []
+
+        for value in [
+            character.get("canonical_name"),
+            character.get("display_name"),
+            *(character.get("aliases") or []),
+            *(character.get("specific_appellations") or []),
+        ]:
+            if isinstance(value, str) and value.strip():
+                terms.append(value.strip())
+
+        for item in character.get("identity_names", []) or []:
+            value = item.get("value") if isinstance(item, dict) else None
+            if isinstance(value, str) and value.strip():
+                terms.append(value.strip())
+
+        return terms
 
     def _normalize_response(
         self,

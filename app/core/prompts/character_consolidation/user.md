@@ -15,3 +15,8 @@ CANDIDATE_A:
 
 CANDIDATE_B:
 {{CANDIDATE_B_JSON}}
+
+SOURCE_CONTEXT:
+{{SOURCE_CONTEXT_JSON}}
+
+Usa SOURCE_CONTEXT solo como apoyo para verificar menciones y fragmentos originales relacionados con los candidatos. No inventes datos fuera de CANDIDATE_A, CANDIDATE_B y SOURCE_CONTEXT.
