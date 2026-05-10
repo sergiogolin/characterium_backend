@@ -57,3 +57,7 @@ def get_consolidation_llm():
 
 def get_prompt_generation_llm():
     return create_llm(get_llm_config("PROMPT_GENERATION"))
+
+
+def get_image_generation_llm():
+    return create_llm(get_llm_config("IMAGE_GENERATION"))

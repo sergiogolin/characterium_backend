@@ -1,14 +1,18 @@
 import json
+from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from app.core.config import is_debug_pipeline_enabled
 from app.core.job_progress import JobProgressPublisher
 from app.core.jobs import InMemoryJobStore
 from app.core.types import JobResult
 from app.core.status_log_publisher import StatusLogPublisher
+from app.services.image_generation.image_generator import ImageGenerator, ImageGenerationError
 from app.services.ingestion.upload_reader import FileReadError, read_uploaded_file_data
 from app.services.llm.llm_factory import get_consolidation_llm
 from app.services.consolidation.character_consolidation_llm import CharacterConsolidationLLM
@@ -21,6 +25,16 @@ from app.services.text_processing.chunking_service import ChunkingError, chunk_u
 
 jobs = InMemoryJobStore()
 app = FastAPI()
+
+
+# Modelo para el request de generación de imagen
+class ImageGenerationRequest(BaseModel):
+    prompt: str
+    style: str = "fotorrealista"  # Valor por defecto
+
+
+# Almacenamiento en memoria para estado de generación
+_image_generation_status = {}
 
 
 def _debug_pipeline_print(*values) -> None:
@@ -301,6 +315,144 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         await progress.publish(step="error", message=f"Error: {exc}")
 
 
+@app.post("/api/generate-image")
+async def generate_image(
+    background_tasks: BackgroundTasks,
+    request: ImageGenerationRequest,
+):
+    """
+    Endpoint para generar imágenes de personajes de forma asíncrona.
+
+    Request:
+    {
+        "prompt": "Descripción del personaje",
+        "style": "fotorrealista"  # opcional, default: "fotorrealista"
+    }
+
+    Response:
+    {
+        "jobId": "id-unico",
+        "message": "Generación iniciada"
+    }
+    """
+    import uuid
+    import time
+
+    job_id = str(uuid.uuid4())
+    timestamp = time.time()
+
+    _image_generation_status[job_id] = {
+        "status": "processing",
+        "prompt": request.prompt,
+        "style": request.style,
+        "started_at": timestamp,
+        "result": None,
+        "error": None,
+    }
+
+    _debug_pipeline_print("\n" + "=" * 70)
+    _debug_pipeline_print(f"Generación de imagen iniciada: {job_id}")
+    _debug_pipeline_print(f"Prompt: {request.prompt}")
+    _debug_pipeline_print(f"Estilo: {request.style}")
+    _debug_pipeline_print("=" * 70)
+
+    background_tasks.add_task(
+        _process_image_generation,
+        job_id=job_id,
+        prompt=request.prompt,
+        style=request.style,
+    )
+
+    return {
+        "jobId": job_id,
+        "message": "Generación de imagen iniciada",
+    }
+
+
+async def _process_image_generation(*, job_id: str, prompt: str, style: str) -> None:
+    """
+    Procesa la generación de imagen en segundo plano.
+    """
+    try:
+        generator = ImageGenerator()
+
+        _debug_pipeline_print(f"Procesando generación de imagen: {job_id}")
+
+        result = await generator.generate_and_save_image(
+            prompt=prompt,
+            graphic_style=style,
+        )
+
+        _image_generation_status[job_id]["status"] = "completed"
+        _image_generation_status[job_id]["result"] = result
+
+        _debug_pipeline_print(f"Imagen generada exitosamente: {job_id}")
+
+    except ImageGenerationError as e:
+        _image_generation_status[job_id]["status"] = "failed"
+        _image_generation_status[job_id]["error"] = str(e)
+
+        _debug_pipeline_print(f"Error generando imagen: {job_id}")
+        _debug_pipeline_print(f"Detalles: {str(e)}")
+
+    except Exception as e:
+        _image_generation_status[job_id]["status"] = "failed"
+        _image_generation_status[job_id]["error"] = f"Error inesperado: {str(e)}"
+
+        _debug_pipeline_print(f"Error inesperado en generación: {job_id}")
+        _debug_pipeline_print(f"Detalles: {str(e)}")
+
+
+@app.get("/api/generate-image/{job_id}")
+async def get_image_status(job_id: str):
+    """
+    Obtiene el estado de una generación de imagen.
+
+    Response si está en proceso:
+    {
+        "status": "processing",
+        "message": "Generando imagen..."
+    }
+
+    Response si completó exitosamente:
+    {
+        "status": "completed",
+        "imagePath": "/images/generated/abc123.png",
+        "imageUrl": "http://localhost:8000/images/generated/abc123.png"
+    }
+
+    Response si falló:
+    {
+        "status": "failed",
+        "error": "Descripción del error"
+    }
+    """
+    if job_id not in _image_generation_status:
+        raise HTTPException(404, "Job no encontrado")
+
+    status_info = _image_generation_status[job_id]
+
+    if status_info["status"] == "processing":
+        return {
+            "status": "processing",
+            "message": "Generando imagen...",
+        }
+
+    if status_info["status"] == "completed":
+        result = status_info["result"]
+        return {
+            "status": "completed",
+            "imagePath": result["imagePath"],
+            "imageUrl": result["imageUrl"],
+        }
+
+    if status_info["status"] == "failed":
+        return {
+            "status": "failed",
+            "error": status_info["error"],
+        }
+
+
 @app.get("/jobs/{job_id}")
 async def get_job(job_id: str):
     st = jobs.get(job_id)
@@ -331,6 +483,11 @@ def main() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Configurar carpeta de archivos estáticos para imágenes generadas
+    public_path = Path(__file__).parent.parent / "public"
+    if public_path.exists():
+        app.mount("/images", StaticFiles(directory=str(public_path / "images")), name="images")
 
     return app
 
