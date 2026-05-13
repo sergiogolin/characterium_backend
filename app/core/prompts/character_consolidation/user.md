@@ -1,6 +1,6 @@
-Compara los dos candidatos usando solo la informacion incluida a continuacion.
+Compara los dos candidatos usando solo la informacion incluida a continuación.
 
-El score programatico y sus razones explican por que este par llego al LLM, pero no sustituyen tu decision. Basa la respuesta final en la compatibilidad real de nombres, alias, apelativos, relaciones, edad, genero, especie/naturaleza, rasgos estables y contexto narrativo.
+El score programático y sus razones explican por qué este par llegó al LLM, pero no sustituyen tu decisión. Basa la respuesta final en la compatibilidad real de nombres, alias, apelativos, relaciones, edad, género, especie/naturaleza, rasgos estables y contexto narrativo.
 
 Devuelve solo el JSON obligatorio.
 

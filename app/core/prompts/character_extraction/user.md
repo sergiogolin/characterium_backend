@@ -11,7 +11,7 @@ Instrucciones adicionales:
 - Si el chunk mezcla páginas preliminares/finales con relato, ignora solo el material externo y conserva la extracción de las escenas, diálogos y narración que sí pertenecen a la historia.
 - Si no hay personajes útiles en el texto, devuelve el objeto JSON con este `chunk_index` y `"characters": []`.
 - Usa citas breves, no párrafos enteros.
-- No repitas informacion en varios campos si no aporta valor.
+- No repitas información en varios campos si no aporta valor.
 - Si una motivación no es evidente, déjala vacía u omite el campo según el esquema.
 - Si una relación no aparece claramente identificada, no la inventes.
 
