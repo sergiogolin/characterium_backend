@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from openai import AsyncOpenAI
 
 from app.services.llm.base import BaseLLM
@@ -45,3 +47,33 @@ class OllamaLLM(BaseLLM):
             raise ValueError("Respuesta vacía del modelo")
 
         return content
+
+    async def generate_image(self, prompt: str) -> bytes:
+        response = await self.client.chat.completions.create(
+            model=self.model_id,
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            extra_body={
+                "modalities": ["image"],
+                "image_config": {
+                    "aspect_ratio": "3:4",
+                },
+            },
+        )
+
+        data = response.model_dump()
+        choices = data.get("choices") or []
+        if not choices:
+            raise ValueError("Respuesta sin choices del modelo de imagen")
+
+        message = choices[0].get("message") or {}
+        images = message.get("images") or []
+        if not images:
+            raise ValueError("Respuesta sin imagenes del modelo")
+
+        image_url = (images[0].get("image_url") or {}).get("url")
+        if not image_url or "," not in image_url:
+            raise ValueError("Respuesta de imagen invalida del modelo")
+
+        return base64.b64decode(image_url.split(",", 1)[1])

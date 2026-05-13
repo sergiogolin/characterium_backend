@@ -1,3 +1,4 @@
+import io
 from typing import Any
 
 from huggingface_hub import AsyncInferenceClient
@@ -58,3 +59,19 @@ class HuggingFaceLLM(BaseLLM):
             raise ValueError("Respuesta vacia del modelo")
 
         return content
+
+    async def generate_image(self, prompt: str) -> bytes:
+        request_kwargs: dict[str, Any] = {}
+        if self._passes_model_per_request:
+            request_kwargs["model"] = self.model_id
+
+        image = await self.client.text_to_image(
+            prompt,
+            width=600,
+            height=800,
+            **request_kwargs,
+        )
+
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        return buffer.getvalue()

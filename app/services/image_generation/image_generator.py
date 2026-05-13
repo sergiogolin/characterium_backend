@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import base64
-import io
 import json
 import re
 from typing import Optional
 
 from app.services.image_generation.image_generation_llm import ImageGenerationLLM
 from app.services.image_generation.image_storage import ImageStorageService
-from app.services.llm.llm_factory import get_image_generation_llm
+from app.services.llm.llm_factory import get_image_generation_llm, get_prompt_generation_llm
 
 
 class ImageGenerationError(Exception):
@@ -65,7 +63,8 @@ class ImageGenerator:
         storage_service: Optional[ImageStorageService] = None,
     ):
         self.storage = storage_service or ImageStorageService()
-        self.llm = get_image_generation_llm()
+        self.prompt_llm = get_prompt_generation_llm()
+        self.image_llm = get_image_generation_llm()
 
     async def generate_and_save_image(
         self,
@@ -121,9 +120,7 @@ class ImageGenerator:
         """
         Genera un prompt optimizado usando el LLM.
         """
-        from app.services.image_generation.image_generation_llm import ImageGenerationLLM
-
-        image_gen_llm = ImageGenerationLLM(self.llm)
+        image_gen_llm = ImageGenerationLLM(self.prompt_llm)
 
         try:
             optimized_prompt = await image_gen_llm.generate_image_prompt(
@@ -148,8 +145,13 @@ class ImageGenerator:
         :return: Datos binarios de la imagen (PNG/JPEG)
         :raises ImageGenerationError: Si la generación falla
         """
-        # Este es un placeholder. La implementación real dependerá del provider LLM
-        # que soporte generación de imágenes. Para ahora, retorna un error informativo.
+        generate_image = getattr(self.image_llm, "generate_image", None)
+        if generate_image:
+            try:
+                return await generate_image(image_prompt)
+            except Exception as e:
+                clean_message = _extract_clean_error_message(e)
+                raise ImageGenerationError(clean_message) from e
 
         raise ImageGenerationError(
             "La generación de imágenes requiere un modelo LLM compatible. "

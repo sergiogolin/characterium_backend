@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from openai import AsyncOpenAI
 
 from app.services.llm.base import BaseLLM
@@ -46,3 +48,16 @@ class GeminiLLM(BaseLLM):
             raise ValueError("Respuesta vacia del modelo")
 
         return content
+
+    async def generate_image(self, prompt: str) -> bytes:
+        response = await self.client.images.generate(
+            model=self.model_id,
+            prompt=prompt,
+            response_format="b64_json",
+            n=1,
+        )
+
+        if not response.data or not response.data[0].b64_json:
+            raise ValueError("Respuesta sin imagenes del modelo")
+
+        return base64.b64decode(response.data[0].b64_json)
