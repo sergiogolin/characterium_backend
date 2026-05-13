@@ -2,19 +2,19 @@
 
 Backend para analizar manuscritos y extraer personajes de forma asistida por LLM.
 
-La API esta desarrollada con **Python 3.11** y **FastAPI**. Permite subir libros o documentos, extraer texto, dividirlo en chunks narrativos, detectar personajes por fragmentos y consolidar identidades repetidas o ambiguas.
+La API está desarrollada con **Python 3.11** y **FastAPI**. Permite subir libros o documentos, extraer texto, dividirlo en chunks narrativos, detectar personajes por fragmentos y consolidar identidades repetidas o ambiguas.
 
 ## Estado actual
 
 - Subida de archivos en formatos **TXT**, **PDF**, **EPUB**, **DOC** y **DOCX**.
-- Extraccion de texto mediante readers especificos por formato.
-- Jobs en memoria para procesamiento asincrono.
+- Extracción de texto mediante readers específicos por formato.
+- Jobs en memoria para procesamiento asíncrono.
 - Stream de progreso mediante **Server-Sent Events (SSE)**.
-- Chunking jerarquico por capitulos/parrafos, con overlap.
-- Filtrado conservador de material no narrativo: indice, copyright, dedicatorias, notas, resenas, etc.
-- Extraccion de personajes por chunks usando prompts versionados en `app/core/prompts`.
-- Consolidacion de personajes, alias, apelativos, rasgos, relaciones y conflictos.
-- Resolucion opcional de ambiguedades con LLM.
+- Chunking jerárquico por capítulos/párrafos, con overlap.
+- Filtrado conservador de material no narrativo: índice, copyright, dedicatorias, notas, reseñas, etc.
+- Extracción de personajes por chunks usando prompts versionados en `app/core/prompts`.
+- Consolidación de personajes, alias, apelativos, rasgos, relaciones y conflictos.
+- Resolución opcional de ambigüedades con LLM.
 - Providers LLM configurables por variables de entorno: `ollama`, `gemini`, `openrouter` y `hugging_face`.
 
 ## Requisitos
@@ -54,7 +54,7 @@ La API esta desarrollada con **Python 3.11** y **FastAPI**. Permite subir libros
 +-- README.md
 ```
 
-## Instalacion
+## Instalación
 
 Desde la raiz del backend:
 
@@ -64,13 +64,13 @@ py -3.11 -m venv venv
 pip install -r requirements.txt
 ```
 
-## Configuracion
+## Configuración
 
-La configuracion se divide en tres piezas:
+La configuración se divide en tres piezas:
 
 - `env.example`: plantilla de variables de entorno. No contiene secretos.
 - `.env`: archivo local con secretos reales. No debe subirse al repositorio.
-- `config/app_config.json`: configuracion no secreta del pipeline LLM.
+- `config/app_config.json`: configuración no secreta del pipeline LLM.
 
 ### Variables de entorno
 
@@ -80,7 +80,7 @@ Copia `env.example` a `.env` antes de arrancar el backend:
 Copy-Item env.example .env
 ```
 
-Despues, edita `.env` y rellena solo las claves de los proveedores que vayas a usar. No hace falta configurar todas las `API_KEY`.
+Después, edita `.env` y rellena solo las claves de los proveedores que vayas a usar. No hace falta configurar todas las `API_KEY`.
 
 Ejemplo:
 
@@ -103,13 +103,13 @@ Claves reconocidas por proveedor:
 - `gemini`: `GEMINI_API_KEY`
 - `hugging_face`: `HUGGING_FACE_API_KEY` o `HF_TOKEN`
 
-Tambien existe `LLM_API_KEY` como fallback generico si el proveedor seleccionado no tiene una clave especifica.
+También existe `LLM_API_KEY` como fallback genérico si el proveedor seleccionado no tiene una clave específica.
 
-### Configuracion de providers
+### Configuración de providers
 
-La configuracion no secreta vive en `config/app_config.json` y se recarga en caliente cuando cambia el archivo. Ahi puedes tocar provider, modelos, temperaturas, URLs base y flags como `DEBUG_PIPELINE` sin reiniciar el servidor.
+La configuración no secreta vive en `config/app_config.json` y se recarga en caliente cuando cambia el archivo. Ahí puedes tocar provider, modelos, temperaturas, URLs base y flags como `DEBUG_PIPELINE` sin reiniciar el servidor.
 
-Configuracion minima recomendada para Ollama:
+Configuración mínima recomendada para Ollama:
 
 ```json
 {
@@ -146,7 +146,7 @@ Para cambiar de proveedor global, modifica `LLM_MODE` y `LLM_MODEL_ID`:
 }
 ```
 
-Tambien se pueden definir providers, modelos y temperaturas distintos por fase. Si una configuracion por fase esta incompleta, el sistema vuelve a la configuracion global.
+También se pueden definir providers, modelos y temperaturas distintos por fase. Si una configuración por fase esta incompleta, el sistema vuelve a la configuración global.
 
 ```json
 {
@@ -166,11 +166,11 @@ Tambien se pueden definir providers, modelos y temperaturas distintos por fase. 
 
 Las fases configurables son:
 
-- `EXTRACTION`: extraccion de personajes por fragmentos.
-- `CONSOLIDATION`: consolidacion y resolucion de identidades ambiguas.
-- `PROMPT_GENERATION`: generacion de prompts visuales cuando se use ese flujo.
+- `EXTRACTION`: extracción de personajes por fragmentos.
+- `CONSOLIDATION`: consolidación y resolución de identidades ambiguas.
+- `PROMPT_GENERATION`: generación de prompts visuales cuando se use ese flujo.
 
-Cada fase puede usar un proveedor diferente, siempre que su `API_KEY` correspondiente este definida en `.env` si el proveedor la requiere.
+Cada fase puede usar un proveedor diferente, siempre que su `API_KEY` correspondiente esté definida en `.env` si el proveedor la requiere.
 
 ## Ejecucion
 
@@ -179,7 +179,7 @@ Cada fase puede usar un proveedor diferente, siempre que su `API_KEY` correspond
 uvicorn app.main:app --reload
 ```
 
-Documentacion interactiva:
+Documentación interactiva:
 
 ```text
 http://localhost:8000/docs
@@ -292,24 +292,23 @@ Cada personaje consolidado puede incluir:
 - Los jobs se guardan solo en memoria.
 - Si se reinicia el servidor, se pierden los jobs activos y completados.
 - El procesamiento depende de que el provider LLM devuelva JSON valido.
-- La extraccion procesa actualmente un maximo de 8 chunks por subida.
-- La API todavia no persiste resultados en base de datos.
-- Los prompts de generacion visual existen como concepto en el modelo de salida, pero el flujo actual se centra en extraccion y consolidacion de personajes.
+- La API todavía no persiste resultados en base de datos.
+- Los prompts de generación visual existen como concepto en el modelo de salida, pero el flujo actual se centra en extracción y consolidación de personajes.
 
-## Proximos pasos sugeridos
+## Próximos pasos sugeridos
 
 - Persistencia de jobs y resultados con SQLite.
-- Validacion estricta del JSON devuelto por LLM.
+- Validación estricta del JSON devuelto por LLM.
 - Endpoint dedicado para generar prompts visuales por personaje.
-- Parametrizar limite de chunks y tamano de chunk desde configuracion.
+- Parametrizar límite de chunks y tamano de chunk desde configuración.
 - Mejorar soporte real de `.doc` si se necesitan documentos Word antiguos.
-- Tests automaticos para readers, chunking, filtrado y consolidacion.
+- Tests automáticos para readers, chunking, filtrado y consolidación.
 
 ## Notas tecnicas
 
-- `app/core/jobs.py` implementa el almacen en memoria y el stream SSE.
-- `app/core/job_progress.py` centraliza la publicacion de progreso.
-- `app/services/llm/llm_config.py` permite configuracion global o por fase.
+- `app/core/jobs.py` implementa el almacén en memoria y el stream SSE.
+- `app/core/job_progress.py` centraliza la publicación de progreso.
+- `app/services/llm/llm_config.py` permite configuración global o por fase.
 - `app/services/llm/llm_factory.py` instancia el provider seleccionado.
 - Los providers `ollama`, `gemini` y `openrouter` usan `AsyncOpenAI`.
 - `hugging_face` usa `AsyncInferenceClient` de `huggingface_hub`.

@@ -156,13 +156,13 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         # Evento de prueba inicial
         await progress.publish(
             step="progress",
-            message="Inicializando procesamiento...",
+            message="Inicializando procesamiento...\n",
             pct=5,
         )
 
-        await logger.append("=" * 60)
+        await logger.append("=" * 50)
         await logger.append(f"📄 Archivo: {filename}")
-        await logger.append("=" * 60)
+        await logger.append("=" * 50)
 
         content = read_uploaded_file_data(filename=filename, data=data)
 
@@ -183,46 +183,45 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         )
 
         await logger.append("")
-        await logger.append("⏳ [1/4] DIVISIÓN EN CHUNKS")
-        await logger.append("-" * 60)
+        await logger.append("\n⏳ [1/4] DIVISIÓN EN CHUNKS")
+        await logger.append("-" * 50)
 
         chunks = chunk_uploaded_content(content)
         source_tools = CharacterSourceTools(chunks)
         _debug_pipeline_print(f"\nTotal chunks generados: {len(chunks)}")
 
-        await logger.append(f"✓ {len(chunks)} chunks generados")
-        await logger.append(f"  Promedio por chunk: {total_chars // len(chunks):,} caracteres")
-
+        # await logger.append(f"✓ {len(chunks)} chunks generados")
         await progress.publish(
             step="chunking",
             message=f"Se han calculado {len(chunks)} chunks.",
         )
+        await logger.append(f"  Promedio por chunk: {total_chars // len(chunks):,} caracteres")
 
         await logger.append("")
-        await logger.append("⏳ [2/4] EXTRACCIÓN DE PERSONAJES")
-        await logger.append("-" * 60)
+        await logger.append("\n⏳ [2/4] EXTRACCIÓN DE PERSONAJES")
+        await logger.append("-" * 50)
         await logger.append("Analizando chunks para extraer personajes...")
 
         chunk_results = await extract_characters_from_chunks(chunks, progress=progress)
         
         total_mentions = sum(len(cr.get("characters", [])) for cr in chunk_results)
         await logger.append(f"✓ Extracción completada")
-        await logger.append(f"  Menciones de personajes encontradas: {total_mentions}")
+        await logger.append(f"\n  Menciones de personajes encontradas: {total_mentions}")
 
         await progress.publish(
             step="character_extraction",
-            message="Extraccion de personajes completada.",
+            message="Extracción de personajes completada.",
             pct=95,
         )
 
         await logger.append("")
-        await logger.append("⏳ [3/4] CONSOLIDACIÓN DE PERSONAJES")
-        await logger.append("-" * 60)
+        await logger.append("\n⏳ [3/4] CONSOLIDACIÓN DE PERSONAJES")
+        await logger.append("-" * 50)
         await logger.append("Resolviendo aliases y consolidando identidades...")
 
         await progress.publish(
             step="character_consolidation",
-            message="Consolidando personajes extraidos...",
+            message="Consolidando personajes extraídos...",
         )
 
         llm = get_consolidation_llm()
@@ -236,12 +235,12 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         _debug_pipeline_print("-" * 50)
 
         num_characters = len(result.get("characters", []))
-        await logger.append(f"✓ Consolidación completada")
-        await logger.append(f"  Personajes únicos identificados: {num_characters}")
+        await logger.append(f"\n✓ Consolidación completada")
+        await logger.append(f"  Personajes únicos identificados: {num_characters}\n")
 
         await progress.publish(
             step="character_consolidation",
-            message="Consolidacion de personajes completada.",
+            message="Consolidación de personajes completada.",
             pct=97,
         )
 
@@ -250,8 +249,8 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         await logger.append(f"  Idioma detectado: {lang_label}")
 
         await logger.append("")
-        await logger.append("⏳ [4/4] GENERACIÓN DE PROMPTS")
-        await logger.append("-" * 60)
+        await logger.append("\n⏳ [4/4] GENERACIÓN DE PROMPTS")
+        await logger.append("-" * 50)
         await logger.append(f"Generando prompts para {num_characters} personajes...")
 
         await progress.publish(
@@ -268,18 +267,18 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         )
 
         await logger.append(f"✓ Prompts generados correctamente")
-        await logger.append(f"  Total de prompts: {len(generated_characters)}")
+        await logger.append(f"  Total de prompts: {len(generated_characters)}\n")
 
         await progress.publish(
             step="prompt_generation",
-            message="Generacion de fichas y prompts visuales completada.",
+            message="Generación de fichas y prompts visuales completada.",
             pct=99,
         )
 
-        await logger.append("")
-        await logger.append("=" * 60)
+        await logger.append("\n")
+        await logger.append("=" * 50)
         await logger.append("✅ PROCESAMIENTO COMPLETADO EXITOSAMENTE")
-        await logger.append("=" * 60)
+        await logger.append("=" * 50)
 
         jobs.set_done(
             job_id,
@@ -300,7 +299,7 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
     except (FileReadError, ChunkingError) as exc:
         await logger.append("")
         await logger.append("❌ ERROR EN EL PROCESAMIENTO")
-        await logger.append("-" * 60)
+        await logger.append("-" * 50)
         await logger.append(f"Tipo: {type(exc).__name__}")
         await logger.append(f"Detalle: {str(exc)}")
         jobs.set_error(job_id, str(exc))
@@ -308,7 +307,7 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
     except Exception as exc:
         await logger.append("")
         await logger.append("❌ ERROR INESPERADO")
-        await logger.append("-" * 60)
+        await logger.append("-" * 50)
         await logger.append(f"Tipo: {type(exc).__name__}")
         await logger.append(f"Detalle: {str(exc)}")
         jobs.set_error(job_id, str(exc))
