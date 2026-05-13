@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import re
 from typing import Optional
 
 from app.services.image_generation.image_generation_llm import ImageGenerationLLM
@@ -12,6 +14,44 @@ from app.services.llm.llm_factory import get_image_generation_llm
 class ImageGenerationError(Exception):
     """Error durante la generación de imagen"""
     pass
+
+
+def _extract_clean_error_message(error: Exception) -> str:
+    """
+    Extrae un mensaje de error limpio de una excepción.
+    
+    Intenta extraer el mensaje específico del error, especialmente si
+    contiene estructuras como {'error': {'message': '...', 'code': ...}}
+    
+    :param error: La excepción a procesar
+    :return: Mensaje de error limpio
+    """
+    error_str = str(error)
+    
+    # Intentar extraer diccionario JSON con estructura {'error': {'message': '...'}}
+    try:
+        # Buscar patrones de diccionario en el string
+        dict_pattern = r"\{'error': \{'message': '([^']+)'.*?\}\}"
+        match = re.search(dict_pattern, error_str)
+        if match:
+            return match.group(1)
+    except:
+        pass
+    
+    # Intentar parsear como JSON directo
+    try:
+        error_json = json.loads(error_str)
+        if isinstance(error_json, dict):
+            if 'error' in error_json and isinstance(error_json['error'], dict):
+                if 'message' in error_json['error']:
+                    return error_json['error']['message']
+            elif 'message' in error_json:
+                return error_json['message']
+    except:
+        pass
+    
+    # Retornar el error original si no se puede extraer
+    return error_str
 
 
 class ImageGenerator:
@@ -65,8 +105,13 @@ class ImageGenerator:
                 "success": True,
             }
 
+        except ImageGenerationError:
+            # Si ya es un ImageGenerationError, re-lanzar tal cual
+            raise
         except Exception as e:
-            raise ImageGenerationError(f"Error generando imagen: {str(e)}") from e
+            # Para otros errores, extraer mensaje limpio
+            clean_message = _extract_clean_error_message(e)
+            raise ImageGenerationError(clean_message) from e
 
     async def _generate_optimized_prompt(
         self,
@@ -87,9 +132,8 @@ class ImageGenerator:
             )
             return optimized_prompt
         except Exception as e:
-            raise ImageGenerationError(
-                f"Error generando prompt optimizado: {str(e)}"
-            ) from e
+            clean_message = _extract_clean_error_message(e)
+            raise ImageGenerationError(clean_message) from e
 
     async def _call_image_generation_llm(self, image_prompt: str) -> bytes:
         """
