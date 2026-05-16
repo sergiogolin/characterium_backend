@@ -70,7 +70,7 @@ La configuración se divide en tres piezas:
 
 - `env.example`: plantilla de variables de entorno. No contiene secretos.
 - `.env`: archivo local con secretos reales. No debe subirse al repositorio.
-- `config/app_config.json`: configuración no secreta del pipeline LLM.
+- `config/app_config.yml`: configuración no secreta del pipeline LLM.
 
 ### Variables de entorno
 
@@ -107,7 +107,7 @@ También existe `LLM_API_KEY` como fallback genérico si el proveedor selecciona
 
 ### Configuración de providers
 
-La configuración no secreta vive en `config/app_config.json` y se recarga en caliente cuando cambia el archivo. Ahí puedes tocar provider, modelos, temperaturas, URLs base y flags como `DEBUG_PIPELINE` sin reiniciar el servidor.
+La configuración no secreta vive en `config/app_config.yml` y se recarga en caliente cuando cambia el archivo. Ahí puedes tocar provider, modelos, temperaturas, URLs base y flags como `DEBUG_PIPELINE` sin reiniciar el servidor.
 
 Configuración mínima recomendada para Ollama:
 

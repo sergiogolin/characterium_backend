@@ -24,7 +24,7 @@ def _with_provider_base_url(config: LLMConfig) -> LLMConfig:
 
     base_url = config.base_url or get_config_str(env_name) or os.getenv(env_name)
     if not base_url or not base_url.strip():
-        raise RuntimeError(f"Falta {env_name} en config/app_config.json o .env")
+        raise RuntimeError(f"Falta {env_name} en config/app_config.yml o .env")
 
     return replace(config, base_url=base_url.strip())
 

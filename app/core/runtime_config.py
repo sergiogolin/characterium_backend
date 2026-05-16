@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
+import yaml
 
-CONFIG_PATH = Path(os.getenv("APP_CONFIG_PATH", "config/app_config.json"))
+
+CONFIG_PATH = Path(os.getenv("APP_CONFIG_PATH", "config/app_config.yml"))
 
 _config_cache: dict[str, Any] = {}
 _config_mtime_ns: int | None = None
@@ -26,10 +27,10 @@ def _load_config() -> dict[str, Any]:
         return _config_cache
 
     with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
-        loaded = json.load(config_file)
+        loaded = yaml.safe_load(config_file)
 
     if not isinstance(loaded, dict):
-        raise RuntimeError(f"{CONFIG_PATH} debe contener un objeto JSON")
+        raise RuntimeError(f"{CONFIG_PATH} debe contener un objeto YAML")
 
     _config_cache = loaded
     _config_mtime_ns = stat.st_mtime_ns

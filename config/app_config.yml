@@ -1,0 +1,37 @@
+# Debug y configuración general del pipeline
+DEBUG_PIPELINE: true
+
+# Configuración de chunking y procesamiento de texto
+DEFAULT_MAX_CHARS: 5000
+DEFAULT_OVERLAP_PARAGRAPHS: 1
+
+# Configuración LLM principal (fallback por defecto)
+LLM_MODE: ollama
+LLM_MODEL_ID: qwen2.5:7b
+LLM_TEMPERATURE: 0.2
+
+# URLs base de los diferentes proveedores LLM
+OLLAMA_BASE_URL: http://localhost:11434/v1/
+OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+GEMINI_BASE_URL: https://generativelanguage.googleapis.com/v1beta/openai/
+HUGGING_FACE_BASE_URL: https://router.huggingface.co/v1
+
+# Configuración LLM para extracción de personajes
+EXTRACTION_LLM_MODE: ollama
+EXTRACTION_LLM_MODEL_ID: qwen2.5:7b
+EXTRACTION_LLM_TEMPERATURE: 0.1
+
+# Configuración LLM para consolidación de personajes duplicados
+CONSOLIDATION_LLM_MODE: ollama
+CONSOLIDATION_LLM_MODEL_ID: qwen2.5:7b
+CONSOLIDATION_LLM_TEMPERATURE: 0.0
+
+# Configuración LLM para generación de prompts de personajes
+PROMPT_GENERATION_LLM_MODE: ollama
+PROMPT_GENERATION_LLM_MODEL_ID: qwen2.5:7b
+PROMPT_GENERATION_LLM_TEMPERATURE: 0.4
+
+# Configuración LLM para generación de imágenes
+IMAGE_GENERATION_LLM_MODE: openrouter
+IMAGE_GENERATION_LLM_MODEL_ID: black-forest-labs/flux.2-klein-4b
+IMAGE_GENERATION_LLM_TEMPERATURE: 0.7

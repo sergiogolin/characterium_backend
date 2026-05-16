@@ -171,7 +171,7 @@ try {
 
 ## Configuración
 
-La generación de imágenes usa un LLM configurado con el prefijo `IMAGE_GENERATION` en `config/app_config.json`:
+La generación de imágenes usa un LLM configurado con el prefijo `IMAGE_GENERATION` en `config/app_config.yml`:
 
 ```json
 {
