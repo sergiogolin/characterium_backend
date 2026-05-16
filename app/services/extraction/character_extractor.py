@@ -82,7 +82,7 @@ async def extract_characters_from_chunks(
     results: list[dict[str, Any]] = []
     total_chunks = len(chunks)
 
-    for chunk_index, chunk_text in enumerate(chunks[:4]):
+    for chunk_index, chunk_text in enumerate(chunks[:5]):
         display_index = chunk_index + 1
         await character_extraction_progress.publish(
             progress,

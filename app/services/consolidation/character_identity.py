@@ -78,6 +78,28 @@ def normalize_text(value: str) -> str:
     return value
 
 
+def normalize_for_alias_comparison(value: str) -> str:
+    """
+    Normaliza texto para comparación de alias con nombres canónicos.
+    
+    Reemplaza guiones bajos por espacios, quita números, y aplica normalización estándar.
+    Esto permite detectar alias como "tortuga_1" que corresponden al nombre "Tortuga",
+    o "hombres_grises_1" que corresponde a "Hombre grises".
+
+    :param value: Texto original a normalizar
+    :return: Texto normalizado sin guiones bajos ni números
+    """
+    # Reemplazar guiones bajos por espacios
+    value = value.replace("_", " ")
+    # Quitar números para la comparación
+    value = re.sub(r"\d+", "", value)
+    # Aplicar normalización estándar
+    value = normalize_text(value)
+    # Compactar espacios nuevamente después de remover números
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
 def looks_like_generated_local_id(value: str) -> bool:
     """
     Detecta IDs tecnicos que no deberian convertirse en nombres canonicos.

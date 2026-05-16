@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.services.consolidation.character_identity import normalize_text
+from app.services.consolidation.character_identity import normalize_for_alias_comparison, normalize_text
 from app.services.llm.base import BaseLLM
 from app.services.llm.json_utils import parse_json_object_response
 from app.services.prompts.prompt_loader import load_prompt, render_prompt
@@ -127,7 +127,7 @@ class CharacterPromptGenerationLLM:
         if not isinstance(aliases, list):
             aliases = []
 
-        normalized_main = normalize_text(main_name)
+        normalized_main = normalize_for_alias_comparison(main_name)
         clean_aliases = []
         seen_aliases = set()
 
@@ -136,7 +136,7 @@ class CharacterPromptGenerationLLM:
                 continue
 
             clean_alias = alias.strip()
-            normalized_alias = normalize_text(clean_alias)
+            normalized_alias = normalize_for_alias_comparison(clean_alias)
 
             if not clean_alias or normalized_alias == normalized_main or normalized_alias in seen_aliases:
                 continue

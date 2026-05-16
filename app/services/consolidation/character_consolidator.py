@@ -10,6 +10,7 @@ from app.services.consolidation.character_identity import (
     choose_best_canonical_name,
     extract_identity_candidates,
     looks_like_descriptive_form,
+    normalize_for_alias_comparison,
     normalize_text,
 )
 from app.services.consolidation.character_identity_scoring import score_identity_match
@@ -489,10 +490,10 @@ class CharacterConsolidator:
         :param candidates: Candidatos de identidad ya calculados
         :return: None
         """
-        canonical_normalized = normalize_text(group["canonical_name"])
+        canonical_normalized = normalize_for_alias_comparison(group["canonical_name"])
 
         for candidate in candidates:
-            value_normalized = normalize_text(candidate.without_titles)
+            value_normalized = normalize_for_alias_comparison(candidate.without_titles)
 
             if looks_like_descriptive_form(candidate.without_titles):
                 continue
@@ -608,7 +609,7 @@ class CharacterConsolidator:
         character["canonical_name"] = best_name
         character["display_name"] = best_name
 
-        if previous_name and normalize_text(previous_name) != normalize_text(best_name):
+        if previous_name and normalize_for_alias_comparison(previous_name) != normalize_for_alias_comparison(best_name):
             self._append_unique(character["aliases"], previous_name)
 
         self._sync_identity_alias_lists(character)
@@ -661,11 +662,11 @@ class CharacterConsolidator:
         :param character: Personaje consolidado a actualizar
         :return: None
         """
-        canonical_normalized = normalize_text(character.get("canonical_name", ""))
+        canonical_normalized = normalize_for_alias_comparison(character.get("canonical_name", ""))
 
         for item in character.get("identity_names", []):
             value = item.get("value")
-            if not value or normalize_text(value) == canonical_normalized:
+            if not value or normalize_for_alias_comparison(value) == canonical_normalized:
                 continue
 
             if item.get("type") == "specific_appellation":
@@ -676,7 +677,7 @@ class CharacterConsolidator:
         character["aliases"] = [
             alias
             for alias in character.get("aliases", [])
-            if normalize_text(alias) != canonical_normalized
+            if normalize_for_alias_comparison(alias) != canonical_normalized
         ]
 
     def _mark_conflicts(self, character: dict[str, Any]) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.consolidation.character_identity import normalize_text
+from app.services.consolidation.character_identity import normalize_for_alias_comparison, normalize_text
 
 
 def make_reference(chunk_index: int, local_id: str) -> dict[str, Any]:
@@ -40,13 +40,13 @@ def merge_character_groups(target: dict[str, Any], source: dict[str, Any]) -> di
     )
 
     for identity_name in [source.get("canonical_name"), source.get("display_name")]:
-        if identity_name and normalize_text(identity_name) != normalize_text(
+        if identity_name and normalize_for_alias_comparison(identity_name) != normalize_for_alias_comparison(
             target.get("canonical_name", "")
         ):
             append_unique_string(target["aliases"], identity_name)
 
     for alias in source.get("aliases", []):
-        if normalize_text(alias) != normalize_text(target.get("canonical_name", "")):
+        if normalize_for_alias_comparison(alias) != normalize_for_alias_comparison(target.get("canonical_name", "")):
             append_unique_string(target["aliases"], alias)
 
     for appellation in source.get("specific_appellations", []):
