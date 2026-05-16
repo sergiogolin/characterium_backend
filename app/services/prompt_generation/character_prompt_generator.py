@@ -72,8 +72,8 @@ GROUP_REFERENCE_TERMS = {
 prompt_generation_progress = IndexedProgressUpdate(
     step="prompt_generation",
     message_template="Generando ficha y prompt del personaje {index}/{total}",
-    start_pct=0,
-    end_pct=100,
+    start_pct=97,
+    end_pct=99,
 )
 
 
