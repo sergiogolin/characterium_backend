@@ -124,19 +124,36 @@ class CharacterConsolidationLLM:
 
     def _identity_terms(self, candidate: dict[str, Any]) -> list[str]:
         terms: list[str] = []
+        terms_lower: set[str] = set()  # For case-insensitive duplicate checking
 
+        # Process base fields
         for value in [
             candidate.get("canonical_name"),
             candidate.get("display_name"),
-            *(candidate.get("aliases") or []),
             *(candidate.get("specific_appellations") or []),
         ]:
             if isinstance(value, str) and value.strip():
-                terms.append(value.strip())
+                cleaned = value.strip()
+                terms.append(cleaned)
+                terms_lower.add(cleaned.lower())
 
+        # Process aliases with underscore replacement and duplicate checking
+        for alias in candidate.get("aliases") or []:
+            if isinstance(alias, str) and alias.strip():
+                # Replace underscores with spaces
+                processed = alias.strip().replace("_", " ")
+                # Only add if not a duplicate (case-insensitive)
+                if processed.lower() not in terms_lower:
+                    terms.append(processed)
+                    terms_lower.add(processed.lower())
+
+        # Process identity_names with duplicate checking
         for item in candidate.get("identity_names", []) or []:
             value = item.get("value") if isinstance(item, dict) else None
             if isinstance(value, str) and value.strip():
-                terms.append(value.strip())
+                cleaned = value.strip()
+                if cleaned.lower() not in terms_lower:
+                    terms.append(cleaned)
+                    terms_lower.add(cleaned.lower())
 
         return terms

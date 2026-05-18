@@ -25,7 +25,14 @@ from app.services.consolidation.character_merge import (
 
 
 class CharacterConsolidator:
-    def __init__(self, llm_resolver: CharacterConsolidationLLM | None = None) -> None:
+    def __init__(
+        self,
+        llm_resolver: CharacterConsolidationLLM | None = None,
+        *,
+        min_references_for_evidence: int = 2,
+        min_identity_names: int = 1,
+        low_confidence_refs_threshold: int = 1,
+    ) -> None:
         """
         Inicializa el consolidador de personajes con un resolvedor LLM opcional.
 
@@ -33,6 +40,10 @@ class CharacterConsolidator:
         :return: None
         """
         self.llm_resolver = llm_resolver
+        # Umbrales configurables para filtrar personajes anecdóticos
+        self.min_references_for_evidence = min_references_for_evidence
+        self.min_identity_names = min_identity_names
+        self.low_confidence_refs_threshold = low_confidence_refs_threshold
 
     async def consolidate(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         """
@@ -92,6 +103,9 @@ class CharacterConsolidator:
 
         for character in consolidated:
             self._update_final_confidence(character)
+
+        # Elimina personajes que aparecen solo de forma anecdótica (evidencia insuficiente)
+        consolidated = self._filter_anecdotal_characters(consolidated)
 
         return {
             "characters": consolidated,
@@ -726,6 +740,91 @@ class CharacterConsolidator:
             character["confidence"] = "high"
         else:
             character["confidence"] = "medium"
+
+    def _is_anecdotal_character(self, character: dict[str, Any]) -> bool:
+        """
+        Decide si un personaje debe considerarse anecdótico (evidencia insuficiente).
+
+        Criterios principales para considerar anecdótico:
+        - `entity_type` es `descriptive` y no hay suficiente evidencia (pocas referencias
+          y sin nombres/aliases/apelativos específicos ni contexto de escena).
+        - Solo aparece en una referencia y no aporta identidad clara.
+        - Confianza final es baja y no hay señales concretas de identidad.
+        """
+        refs = character.get("references") or []
+        references_count = len(refs)
+
+        # Excluir identity_names que son solo `local_id` generados por el extractor
+        reference_local_ids = {
+            ref.get("local_id") for ref in (character.get("references") or []) if ref.get("local_id")
+        }
+
+        identity_names = [
+            item
+            for item in character.get("identity_names", [])
+            if (
+                isinstance(item, dict)
+                and item.get("value")
+                and not looks_like_descriptive_form(item.get("value"))
+                and item.get("value") not in reference_local_ids
+            )
+        ]
+        identity_names_count = len(identity_names)
+
+        aliases_count = len(character.get("aliases", []) or [])
+        specific_count = len(character.get("specific_appellations", []) or [])
+
+        scene = character.get("scene_context") or {}
+        scene_actions = len(scene.get("actions") or [])
+        scene_locations = len(scene.get("locations") or [])
+
+        entity_type = character.get("entity_type", "descriptive")
+
+        canonical = character.get("canonical_name", "") or ""
+
+        # Caso claro: forma descriptiva o genérica sin evidencias
+        if looks_like_descriptive_form(canonical) and references_count < self.min_references_for_evidence and identity_names_count < self.min_identity_names:
+            return True
+
+        # Si es descriptivo y no hay identidad ni contexto relevante
+        if (
+            entity_type != "named"
+            and references_count < self.min_references_for_evidence
+            and identity_names_count < self.min_identity_names
+            and aliases_count == 0
+            and specific_count == 0
+            and scene_actions + scene_locations == 0
+        ):
+            return True
+
+        # Si la confianza es baja y no hay identidad/alias/especifico, considerarlo anecdótico
+        if (
+            character.get("confidence") == "low"
+            and references_count <= self.low_confidence_refs_threshold
+            and identity_names_count < self.min_identity_names
+            and aliases_count == 0
+            and specific_count == 0
+        ):
+            return True
+
+        return False
+
+    def _filter_anecdotal_characters(self, characters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        Filtra la lista de personajes, removiendo aquellos considerados anecdóticos.
+
+        :param characters: Lista de personajes consolidados
+        :return: Lista filtrada
+        """
+        filtered: list[dict[str, Any]] = []
+
+        for c in characters:
+            if self._is_anecdotal_character(c):
+                # No añadir al array final; opcionalmente podríamos registrar o almacenar en otro lugar
+                continue
+            filtered.append(c)
+
+        return filtered
 
     def _find_character_by_name(
         self,
