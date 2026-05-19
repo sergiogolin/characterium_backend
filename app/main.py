@@ -13,7 +13,11 @@ from app.core.jobs import InMemoryJobStore
 from app.core.types import JobResult
 from app.core.status_log_publisher import StatusLogPublisher
 from app.services.image_generation.image_generator import ImageGenerator, ImageGenerationError
-from app.services.ingestion.upload_reader import FileReadError, read_uploaded_file_data
+from app.services.ingestion.upload_reader import (
+    FileReadError,
+    SUPPORTED_FORMATS_MESSAGE,
+    read_uploaded_file_data,
+)
 from app.services.llm.llm_factory import get_consolidation_llm
 from app.services.consolidation.character_consolidation_llm import CharacterConsolidationLLM
 from app.services.consolidation.character_consolidator import CharacterConsolidator
@@ -35,6 +39,10 @@ class ImageGenerationRequest(BaseModel):
 
 # Almacenamiento en memoria para estado de generación
 _image_generation_status = {}
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+MAX_IMAGE_PROMPT_CHARS = 4000
+MIN_IMAGE_PROMPT_WORDS = 5
+MIN_INGESTED_TEXT_CHARS = 500
 
 
 def _debug_pipeline_print(*values) -> None:
@@ -115,6 +123,113 @@ def _book_language_instruction(language: str) -> str:
     return labels.get(language, "el mismo idioma de los datos del personaje")
 
 
+def validate_uploaded_file_is_not_empty(*, data: bytes) -> str | None:
+    if data:
+        return None
+
+    return "El archivo está vacío."
+
+
+def validate_uploaded_filename_is_supported(*, filename: str) -> str | None:
+    if "." not in filename:
+        return SUPPORTED_FORMATS_MESSAGE
+
+    ext = filename.rsplit(".", 1)[-1].lower()
+    if ext in {"txt", "pdf", "epub", "doc", "docx"}:
+        return None
+
+    return SUPPORTED_FORMATS_MESSAGE
+
+
+def validate_uploaded_file_size_is_within_limit(*, data: bytes) -> str | None:
+    if len(data) <= MAX_UPLOAD_BYTES:
+        return None
+
+    max_mb = MAX_UPLOAD_BYTES // 1024 // 1024
+    return f"El archivo supera el tamaño máximo permitido ({max_mb} MB)."
+
+
+def run_guardrails_after_file_upload(*, filename: str, data: bytes) -> str | None:
+    for guardrail in [
+        lambda: validate_uploaded_filename_is_supported(filename=filename),
+        lambda: validate_uploaded_file_is_not_empty(data=data),
+        lambda: validate_uploaded_file_size_is_within_limit(data=data),
+    ]:
+        error = guardrail()
+        if error:
+            return error
+
+    return None
+
+
+def validate_ingested_content_has_extractable_text(*, content: str | list[str]) -> str | None:
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        text = "\n".join(block for block in content if isinstance(block, str))
+    else:
+        return "El contenido extraído no tiene un formato válido."
+
+    if len(text.strip()) >= MIN_INGESTED_TEXT_CHARS:
+        return None
+
+    return f"El archivo debe contener al menos {MIN_INGESTED_TEXT_CHARS} caracteres de texto legible."
+
+
+def run_guardrails_after_ingestion(*, filename: str, content: str | list[str]) -> str | None:
+    for guardrail in [
+        lambda: validate_ingested_content_has_extractable_text(content=content),
+    ]:
+        error = guardrail()
+        if error:
+            return error
+
+    return None
+
+
+def validate_image_prompt_is_not_empty(*, prompt: str) -> str | None:
+    if prompt.strip():
+        return None
+
+    return "El prompt de imagen no puede estar vacío."
+
+
+def validate_image_prompt_length_is_within_limit(*, prompt: str) -> str | None:
+    if len(prompt) <= MAX_IMAGE_PROMPT_CHARS:
+        return None
+
+    return f"El prompt de imagen supera el máximo de {MAX_IMAGE_PROMPT_CHARS} caracteres."
+
+
+def validate_image_prompt_has_enough_descriptive_content(*, prompt: str) -> str | None:
+    if len(prompt.strip().split()) >= MIN_IMAGE_PROMPT_WORDS:
+        return None
+
+    return f"El prompt de imagen debe tener al menos {MIN_IMAGE_PROMPT_WORDS} palabras."
+
+
+def validate_image_prompt_does_not_contain_control_characters(*, prompt: str) -> str | None:
+    allowed = {"\n", "\r", "\t"}
+    if any(ord(char) < 32 and char not in allowed for char in prompt):
+        return "El prompt de imagen contiene caracteres de control no válidos."
+
+    return None
+
+
+def run_guardrails_before_image_generation(*, prompt: str, style: str) -> str | None:
+    for guardrail in [
+        lambda: validate_image_prompt_is_not_empty(prompt=prompt),
+        lambda: validate_image_prompt_length_is_within_limit(prompt=prompt),
+        lambda: validate_image_prompt_has_enough_descriptive_content(prompt=prompt),
+        lambda: validate_image_prompt_does_not_contain_control_characters(prompt=prompt),
+    ]:
+        error = guardrail()
+        if error:
+            return error
+
+    return None
+
+
 @app.post("/upload")
 async def upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     filename = file.filename or ""
@@ -136,6 +251,12 @@ async def upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)
     except Exception as exc:
         jobs.set_error(state.job_id, str(exc))
         await progress.publish(step="error", message=f"Error leyendo archivo: {exc}")
+        return {"job_id": state.job_id}
+
+    guardrail_error = run_guardrails_after_file_upload(filename=filename, data=data)
+    if guardrail_error:
+        jobs.set_error(state.job_id, guardrail_error)
+        await progress.publish(step="error", message=guardrail_error)
         return {"job_id": state.job_id}
 
     background_tasks.add_task(
@@ -165,6 +286,10 @@ async def process_upload_job(*, job_id: str, filename: str, data: bytes) -> None
         await logger.append("=" * 50)
 
         content = read_uploaded_file_data(filename=filename, data=data)
+
+        guardrail_error = run_guardrails_after_ingestion(filename=filename, content=content)
+        if guardrail_error:
+            raise FileReadError(guardrail_error)
 
         if isinstance(content, list):
             _debug_pipeline_print(f"\nReader devolvio {len(content)} bloques")
@@ -336,6 +461,13 @@ async def generate_image(
     """
     import uuid
     import time
+
+    guardrail_error = run_guardrails_before_image_generation(
+        prompt=request.prompt,
+        style=request.style,
+    )
+    if guardrail_error:
+        raise HTTPException(400, guardrail_error)
 
     job_id = str(uuid.uuid4())
     timestamp = time.time()

@@ -8,6 +8,7 @@ Tu tarea es crear una ficha breve y un prompt visual fieles al libro a partir de
 
 1. Devuelve SOLO JSON valido.
 2. No escribas texto fuera del JSON.
+2.1. No uses markdown, comentarios, comas finales ni claves adicionales. La respuesta debe ser un unico objeto JSON parseable y contener exclusivamente las claves del formato obligatorio.
 3. Usa únicamente los datos proporcionados.
 4. No inventes información ni completes huecos con conocimiento externo.
 5. Escribe todos los textos en el idioma indicado por `BOOK_LANGUAGE`.
