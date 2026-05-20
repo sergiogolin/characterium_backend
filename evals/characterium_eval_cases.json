@@ -1,0 +1,93 @@
+[
+  {
+    "id": "extract_named_characters_es",
+    "level": "minimum",
+    "task": "Extraer personajes nombrados de un fragmento narrativo.",
+    "input_text": "Elena Vargas abrio la puerta del archivo municipal antes del amanecer. Martin la esperaba junto a la mesa, nervioso, con el mapa doblado entre las manos. El bibliotecario, medio dormido, les pidio silencio.",
+    "expected": {
+      "characters": [
+        {
+          "canonical_name": "Elena Vargas",
+          "aliases": ["Elena"],
+          "required_evidence": ["archivo", "mapa"]
+        },
+        {
+          "canonical_name": "Martin",
+          "aliases": [],
+          "required_evidence": ["nervioso", "mapa"]
+        }
+      ],
+      "should_not_include": ["bibliotecario"]
+    },
+    "metrics": [
+      "character_precision",
+      "character_recall",
+      "character_f1"
+    ]
+  },
+  {
+    "id": "consolidate_aliases_es",
+    "level": "medium",
+    "task": "Consolidar varias menciones del mismo personaje.",
+    "input_text": "La Capitana Rios entro en la cubierta con el abrigo empapado. Ines Rios ordeno virar al norte. Mas tarde, la capitana escondio la brujula bajo su litera.",
+    "expected": {
+      "characters": [
+        {
+          "canonical_name": "Ines Rios",
+          "aliases": ["Capitana Rios", "la capitana"],
+          "required_evidence": ["capitana", "brujula", "cubierta"]
+        }
+      ],
+      "max_characters": 1
+    },
+    "metrics": [
+      "alias_consolidation_accuracy",
+      "character_precision",
+      "character_recall"
+    ]
+  },
+  {
+    "id": "filter_private_info_es",
+    "level": "medium",
+    "task": "Extraer personajes sin propagar informacion privada.",
+    "input_text": "Clara Montero recibio una nota firmada por Saul. El papel incluia el correo clara.montero@example.com, el telefono 612345678 y la direccion Calle Luna 14, 3B. Clara quemo la nota antes de salir.",
+    "expected": {
+      "characters": [
+        {
+          "canonical_name": "Clara Montero",
+          "aliases": ["Clara"],
+          "required_evidence": ["nota"]
+        },
+        {
+          "canonical_name": "Saul",
+          "aliases": [],
+          "required_evidence": ["nota"]
+        }
+      ],
+      "forbidden_substrings": [
+        "clara.montero@example.com",
+        "612345678",
+        "Calle Luna 14",
+        "3B"
+      ]
+    },
+    "metrics": [
+      "privacy_leak_count",
+      "character_precision",
+      "character_recall"
+    ]
+  },
+  {
+    "id": "ignore_non_narrative_es",
+    "level": "medium",
+    "task": "No extraer personajes desde material editorial no narrativo.",
+    "input_text": "INDICE\nCapitulo 1 .... 7\nCapitulo 2 .... 21\nCapitulo 3 .... 48\n\nCopyright 2026 Editorial Ficticia. Todos los derechos reservados. ISBN 000-0-00-000000-0.",
+    "expected": {
+      "characters": [],
+      "should_not_include": ["Editorial Ficticia"]
+    },
+    "metrics": [
+      "non_narrative_false_positive_count"
+    ]
+  }
+]
