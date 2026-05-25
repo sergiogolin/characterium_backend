@@ -172,6 +172,26 @@ Las fases configurables son:
 
 Cada fase puede usar un proveedor diferente, siempre que su `API_KEY` correspondiente esté definida en `.env` si el proveedor la requiere.
 
+## Modelos de IA recomendados
+
+En cada paso del flujo de Characterium tienes dos modelos sugeridos para usar según tu preferencia.
+
+- **Extracción de personajes**
+  - `deepseek/deepseek-v3.2`: modelo rápido y eficiente, ideal para extraer atributos y personajes de textos largos sin perder fluidez.
+  - `google/gemini-3-flash-preview`: más robusto en comprensión contextual, útil para captar detalles sutiles y referencias implícitas.
+
+- **Consolidación de personajes**
+  - `deepseek/deepseek-v3.2`: buen equilibrio entre velocidad y coherencia, perfecto para agrupar identidades similares sin sobrecargar el pipeline.
+  - `google/gemini-3-flash-preview`: recomendado para resolver alias y coincidencias ambiguas gracias a su mejor manejo del contexto extendido.
+
+- **Generación de prompts**
+  - `google/gemma-4-31b-it`: produce prompts claros, bien estructurados y adecuados para descripciones directas de personajes.
+  - `google/gemini-3-flash-preview`: aporta un estilo más creativo y narrativo, ideal para prompts visuales con tono y ambiente.
+
+- **Generación de imágenes**
+  - `black-forest-labs/flux.2-max`: excelente para ilustraciones detalladas y escenas estilizadas con alto nivel de definición.
+  - `google/gemini-3.1-flash-image-preview`: modelo de respaldo sólido para obtener resultados consistentes, buenos colores y composición fiable.
+
 ## Ejecucion
 
 ```powershell
